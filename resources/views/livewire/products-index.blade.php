@@ -1,17 +1,56 @@
+@php use Illuminate\Support\Str; @endphp
+
 <div>
     <div class="max-w-6xl mx-auto py-8 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between mb-4">
-            <h1 class="text-2xl font-semibold text-gray-800">Products</h1>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-4">
+            <div>
+                <h1 class="text-2xl font-semibold text-gray-800">Products</h1>
+                <p class="mt-1 text-sm text-gray-600">
+                    Search your catalog by title, SKU, GTIN, feed, or description.
+                </p>
+            </div>
 
-            <div class="flex items-center space-x-2 text-sm text-gray-600">
-                <span>Show</span>
-                <select wire:model.number="perPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
-                    <option value="10">10</option>
-                    <option value="15">15</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                </select>
-                <span>per page</span>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:space-x-3 w-full sm:w-auto">
+                <div class="relative flex-1 sm:flex-none sm:w-72">
+                    <input
+                        type="search"
+                        placeholder="Start typing to search products…"
+                        wire:model.live.debounce.400ms="search"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm pl-10 pr-10 py-2"
+                    />
+                    <svg class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 013.978 9.25l3.636 3.636a.75.75 0 11-1.06 1.06l-3.636-3.636A5.5 5.5 0 119 3.5zm0 1.5a4 4 0 100 8 4 4 0 000-8z" clip-rule="evenodd" />
+                    </svg>
+                    @if (trim($search) !== '')
+                        <button
+                            type="button"
+                            wire:click="$set('search', '')"
+                            class="absolute inset-y-0 right-2 flex items-center px-2 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                            Clear
+                        </button>
+                    @endif
+                </div>
+
+                <div class="flex items-center space-x-2 text-sm text-gray-600 sm:justify-end">
+                    <span>Show</span>
+                    <select wire:model.number="perPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span>per page</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between mb-4 text-xs text-gray-500">
+            <div wire:loading.inline wire:target="search,page,perPage">
+                Searching…
+            </div>
+            <div wire:loading.remove>
+                Showing {{ $products->total() }} {{ Str::plural('result', $products->total()) }}
             </div>
         </div>
 
@@ -126,7 +165,11 @@
                     </details>
                 @empty
                     <div class="p-6 text-sm text-gray-600">
-                        No products imported yet.
+                        @if (trim($search) !== '')
+                            No products match your search.
+                        @else
+                            No products imported yet.
+                        @endif
                     </div>
                 @endforelse
             </div>

@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Product;
 use App\Models\ProductAiGeneration;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -16,15 +17,22 @@ class ProductsIndex extends Component
     use WithPagination;
 
     public int $perPage = 15;
+    public string $search = '';
     public array $summaries = [];
     public array $summaryErrors = [];
     public array $loadingSummary = [];
 
     protected $queryString = [
         'perPage' => ['except' => 15],
+        'search' => ['except' => ''],
     ];
 
     public function updatingPerPage(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSearch(): void
     {
         $this->resetPage();
     }
@@ -33,9 +41,34 @@ class ProductsIndex extends Component
     {
         $team = Auth::user()->currentTeam;
 
+        $tokens = Str::of($this->search)
+            ->squish()
+            ->lower()
+            ->explode(' ')
+            ->filter();
+
         $products = Product::query()
             ->with(['feed:id,name', 'aiGeneration'])
             ->where('team_id', $team->id)
+            ->when($tokens->isNotEmpty(), function ($query) use ($tokens) {
+                $query->where(function ($builder) use ($tokens) {
+                    foreach ($tokens as $token) {
+                        $builder->where(function ($inner) use ($token) {
+                            $like = '%'.$token.'%';
+                            $operator = $this->likeOperator();
+
+                            $inner->where('title', $operator, $like)
+                                ->orWhere('sku', $operator, $like)
+                                ->orWhere('gtin', $operator, $like)
+                                ->orWhere('description', $operator, $like)
+                                ->orWhere('url', $operator, $like)
+                                ->orWhereHas('feed', function ($feedQuery) use ($operator, $like) {
+                                    $feedQuery->where('name', $operator, $like);
+                                });
+                        });
+                    }
+                });
+            })
             ->latest('updated_at')
             ->paginate($this->perPage)
             ->withQueryString();
@@ -49,6 +82,11 @@ class ProductsIndex extends Component
         return view('livewire.products-index', [
             'products' => $products,
         ]);
+    }
+
+    protected function likeOperator(): string
+    {
+        return DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
     }
 
     public function summarizeProduct(int $productId): void
