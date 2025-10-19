@@ -4,8 +4,8 @@ namespace App\Livewire;
 
 use App\Models\Product;
 use App\Models\ProductAiGeneration;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -47,7 +47,7 @@ class ProductsIndex extends Component
             ->explode(' ')
             ->filter();
 
-        $products = Product::query()
+        $productsQuery = Product::query()
             ->with(['feed:id,name', 'aiGeneration'])
             ->where('team_id', $team->id)
             ->when($tokens->isNotEmpty(), function ($query) use ($tokens) {
@@ -69,7 +69,9 @@ class ProductsIndex extends Component
                     }
                 });
             })
-            ->latest('updated_at')
+        ;
+
+        $products = $this->orderProducts($productsQuery)
             ->paginate($this->perPage)
             ->withQueryString();
 
@@ -86,7 +88,15 @@ class ProductsIndex extends Component
 
     protected function likeOperator(): string
     {
-        return DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
+        return 'ILIKE';
+    }
+
+    protected function orderProducts(Builder $query): Builder
+    {
+        // Ensure numeric SKUs sort by value while leaving gaps for any non-numeric entries.
+        return $query
+            ->orderByRaw("NULLIF(regexp_replace(sku, '[^0-9]', '', 'g'), '')::numeric NULLS LAST")
+            ->orderBy('sku');
     }
 
     public function summarizeProduct(int $productId): void
