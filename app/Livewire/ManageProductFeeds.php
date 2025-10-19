@@ -160,6 +160,8 @@ class ManageProductFeeds extends Component
                         Product::insert($payload);
                     }
                 }
+
+                $feed->touch();
             });
 
             $this->statusMessage = 'Feed refreshed successfully.';

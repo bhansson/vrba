@@ -150,9 +150,13 @@
                                                 <span wire:loading wire:target="refreshFeed({{ $feed->id }})">Refreshing…</span>
                                             </button>
                                             <button type="button"
-                                                wire:click="deleteFeed({{ $feed->id }})"
+                                                x-data
+                                                x-on:click.prevent="window.confirm('Delete this feed? All imported products from this feed will be removed.') && $wire.deleteFeed({{ $feed->id }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="deleteFeed({{ $feed->id }})"
                                                 class="inline-flex items-center px-3 py-1.5 border border-red-500 rounded-md text-xs font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
-                                                Delete
+                                                <span wire:loading.remove wire:target="deleteFeed({{ $feed->id }})">Delete</span>
+                                                <span wire:loading wire:target="deleteFeed({{ $feed->id }})">Deleting…</span>
                                             </button>
                                         </td>
                                     </tr>
