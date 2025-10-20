@@ -443,7 +443,7 @@ class ManageProductFeeds extends Component
             }
         }
 
-        logger()->error('Feed parse failed for both CSV and XML', [
+        logger()?->error('Feed parse failed for both CSV and XML', [
             'url' => $this->feedUrl,
             'content_type' => $this->lastContentType,
             'fetch_info' => $this->lastFetchInfo,
@@ -468,9 +468,9 @@ class ManageProductFeeds extends Component
         }
 
         if (isset($xml->channel->item)) {
-            $items = collect($xml->channel->item);
+            $items = $this->collectXmlItems($xml->channel->item);
         } elseif (isset($xml->entry)) {
-            $items = collect($xml->entry);
+            $items = $this->collectXmlItems($xml->entry);
         } else {
             $items = collect();
         }
@@ -480,6 +480,29 @@ class ManageProductFeeds extends Component
             'items' => $items,
             'namespaces' => $xml->getNameSpaces(true),
         ];
+    }
+
+    protected function collectXmlItems($element): Collection
+    {
+        if ($element instanceof SimpleXMLElement) {
+            $items = [];
+
+            foreach ($element as $child) {
+                $items[] = $child;
+            }
+
+            if (empty($items)) {
+                $items[] = $element;
+            }
+
+            return collect($items);
+        }
+
+        if (is_iterable($element)) {
+            return collect($element);
+        }
+
+        return collect();
     }
 
     protected function parseCsv(string $content): array
@@ -568,6 +591,10 @@ class ManageProductFeeds extends Component
 
     protected function isLikelyCsv(string $trimmed): bool
     {
+        if (Str::startsWith($trimmed, '<')) {
+            return false;
+        }
+
         if ($this->lastContentType && Str::contains(Str::lower($this->lastContentType), ['csv', 'excel'])) {
             return true;
         }
@@ -668,19 +695,20 @@ class ManageProductFeeds extends Component
 
     protected function extractXmlValue(array $namespaces, SimpleXMLElement $item, string $field): string
     {
-        $value = '';
+        $valueNode = null;
 
         if (str_contains($field, ':')) {
             [$prefix, $name] = explode(':', $field, 2);
 
             if (isset($namespaces[$prefix])) {
-                $value = trim((string) optional($item->children($namespaces[$prefix])->{$name}));
+                $children = $item->children($namespaces[$prefix]);
+                $valueNode = $children ? $children->{$name} ?? null : null;
             }
         } else {
-            $value = trim((string) optional($item->{$field}));
+            $valueNode = $item->{$field} ?? null;
         }
 
-        return $value;
+        return $valueNode === null ? '' : trim((string) $valueNode);
     }
 
     protected function maybeValue(string $type, array $namespaces, $item, string $field, ?array $mappingOverride = null): ?string
