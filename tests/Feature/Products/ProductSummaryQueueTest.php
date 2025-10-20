@@ -1,0 +1,58 @@
+<?php
+
+namespace Tests\Feature\Products;
+
+use App\Jobs\GenerateProductDescriptionSummary;
+use App\Livewire\ProductsIndex;
+use App\Models\Product;
+use App\Models\ProductAiJob;
+use App\Models\ProductFeed;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class ProductSummaryQueueTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_summarize_product_dispatches_ai_job(): void
+    {
+        config()->set('services.openai.api_key', 'test-key');
+
+        Queue::fake();
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $feed = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+        ]);
+
+        $product = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+            ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(ProductsIndex::class)
+            ->call('summarizeProduct', $product->id)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('product_ai_jobs', [
+            'product_id' => $product->id,
+            'prompt_type' => ProductAiJob::PROMPT_DESCRIPTION_SUMMARY,
+            'status' => ProductAiJob::STATUS_QUEUED,
+        ]);
+
+        Queue::assertPushed(GenerateProductDescriptionSummary::class, function (GenerateProductDescriptionSummary $job) use ($product): bool {
+            $jobRecord = ProductAiJob::find($job->productAiJobId);
+
+            return $jobRecord?->product_id === $product->id
+                && $jobRecord->prompt_type === ProductAiJob::PROMPT_DESCRIPTION_SUMMARY;
+        });
+    }
+}

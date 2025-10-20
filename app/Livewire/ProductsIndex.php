@@ -2,12 +2,11 @@
 
 namespace App\Livewire;
 
+use App\Jobs\GenerateProductDescriptionSummary;
 use App\Models\Product;
-use App\Models\ProductAiGeneration;
+use App\Models\ProductAiJob;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -20,6 +19,7 @@ class ProductsIndex extends Component
     public string $search = '';
     public array $summaries = [];
     public array $summaryErrors = [];
+    public array $summaryStatuses = [];
     public array $loadingSummary = [];
 
     protected $queryString = [
@@ -48,7 +48,13 @@ class ProductsIndex extends Component
             ->filter();
 
         $productsQuery = Product::query()
-            ->with(['feed:id,name', 'aiGeneration'])
+            ->with([
+                'feed:id,name',
+                'latestAiDescriptionSummary',
+                'latestAiDescription',
+                'latestAiUsp',
+                'latestAiFaq',
+            ])
             ->where('team_id', $team->id)
             ->when($tokens->isNotEmpty(), function ($query) use ($tokens) {
                 $query->where(function ($builder) use ($tokens) {
@@ -76,8 +82,8 @@ class ProductsIndex extends Component
             ->withQueryString();
 
         foreach ($products as $product) {
-            if ($product->aiGeneration && ! array_key_exists($product->id, $this->summaries)) {
-                $this->summaries[$product->id] = $product->aiGeneration->summary ?? '';
+            if ($product->latestAiDescriptionSummary && ! array_key_exists($product->id, $this->summaries)) {
+                $this->summaries[$product->id] = $product->latestAiDescriptionSummary->content ?? '';
             }
         }
 
@@ -108,72 +114,32 @@ class ProductsIndex extends Component
             ->findOrFail($productId);
 
         $this->summaryErrors[$productId] = null;
+        $this->summaryStatuses[$productId] = null;
         $this->loadingSummary[$productId] = true;
 
         try {
-            $apiKey = config('services.openai.api_key');
-            $model = config('services.openai.model', 'gpt-5');
-            $baseUrl = rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/');
-
-            if (! $apiKey) {
+            if (! config('services.openai.api_key')) {
                 throw new \RuntimeException('OpenAI API key is not configured.');
             }
 
-            $prompt = sprintf(
-                "Create a concise, compelling marketing summary (max 60 words) for the following product. Highlight differentiators and tone it for conversion.\n\nTitle: %s\nDescription: %s",
-                $product->title ?: 'Untitled product',
-                Str::limit(strip_tags($product->description ?? ''), 400)
-            );
-
-            $response = Http::withToken($apiKey)
-                ->timeout(30)
-                ->acceptJson()
-                ->post($baseUrl.'/chat/completions', [
-                    'model' => $model,
-                    'messages' => [
-                        [
-                            'role' => 'system',
-                            'content' => 'You are a product marketing assistant who writes short, high-converting product summaries.',
-                        ],
-                        [
-                            'role' => 'user',
-                            'content' => $prompt,
-                        ],
-                    ],
-                ]);
-
-            if ($response->failed()) {
-                Log::warning('OpenAI request failed', [
-                    'product_id' => $productId,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-
-                throw new \RuntimeException('Failed to generate summary (status '.$response->status().').');
-            }
-
-            $payload = $response->json();
-            $summary = data_get($payload, 'choices.0.message.content');
-
-            if (! $summary) {
-                Log::warning('OpenAI response missing summary', [
-                    'product_id' => $productId,
-                    'response' => $payload,
-                ]);
-                throw new \RuntimeException('Received an empty summary from OpenAI.');
-            }
-
-            $summaryText = trim($summary);
-            $this->summaries[$productId] = $summaryText;
-
             if (! $product->sku) {
-                throw new \RuntimeException('Product is missing an SKU, cannot store summary.');
+                throw new \RuntimeException('Product is missing an SKU, cannot queue summary.');
             }
 
-            ProductAiGeneration::updateOrCreate(
-                ['product_sku' => $product->sku],
-                ['summary' => $summaryText]
-            );
+            $jobRecord = ProductAiJob::create([
+                'team_id' => $team->id,
+                'product_id' => $product->id,
+                'sku' => $product->sku,
+                'prompt_type' => ProductAiJob::PROMPT_DESCRIPTION_SUMMARY,
+                'status' => ProductAiJob::STATUS_QUEUED,
+                'progress' => 0,
+                'queued_at' => now(),
+            ]);
+
+            GenerateProductDescriptionSummary::dispatch($jobRecord->id);
+
+            unset($this->summaries[$productId]);
+            $this->summaryStatuses[$productId] = 'Summary request queued. Track progress on the AI Jobs page.';
         } catch (\Throwable $e) {
             $this->summaryErrors[$productId] = $e->getMessage();
         } finally {

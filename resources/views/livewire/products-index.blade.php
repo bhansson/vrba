@@ -82,7 +82,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="summarizeProduct({{ $product->id }})">
                                     <span wire:loading.remove wire:target="summarizeProduct({{ $product->id }})">Generate Summary</span>
-                                    <span wire:loading wire:target="summarizeProduct({{ $product->id }})">Generating…</span>
+                                    <span wire:loading wire:target="summarizeProduct({{ $product->id }})">Queueing…</span>
                                 </x-button>
                             </div>
                         </summary>
@@ -125,39 +125,41 @@
                             <div class="pt-3 border-t border-gray-200">
                                 <span class="font-semibold block mb-1">AI Summary:</span>
                                 @if (isset($loadingSummary[$product->id]) && $loadingSummary[$product->id])
-                                    <p class="text-gray-500">Generating summary…</p>
+                                    <p class="text-gray-500">Queueing summary request…</p>
                                 @elseif (!empty($summaryErrors[$product->id]))
                                     <p class="text-red-600 text-sm">{{ $summaryErrors[$product->id] }}</p>
+                                @elseif (!empty($summaryStatuses[$product->id]))
+                                    <p class="text-indigo-600 text-sm">{{ $summaryStatuses[$product->id] }}</p>
                                 @elseif (!empty($summaries[$product->id]))
                                     <p class="text-gray-800">{{ $summaries[$product->id] }}</p>
-                                @elseif ($product->aiGeneration?->summary)
-                                    <p class="text-gray-800">{{ $product->aiGeneration->summary }}</p>
+                                @elseif ($product->latestAiDescriptionSummary?->content)
+                                    <p class="text-gray-800">{{ $product->latestAiDescriptionSummary->content }}</p>
                                 @else
                                     <p class="text-gray-500 text-sm">Click “Generate Summary” to create a marketing snippet for this product.</p>
                                 @endif
                             </div>
-                            @if ($product->aiGeneration)
+                            @if ($product->latestAiDescription || $product->latestAiUsp || $product->latestAiFaq)
                                 <div class="space-y-2 text-sm">
-                                    @if ($product->aiGeneration->description)
+                                    @if ($product->latestAiDescription?->content)
                                         <div>
                                             <span class="font-semibold">AI Description:</span>
-                                            <p class="mt-1 text-gray-700 whitespace-pre-wrap">{{ $product->aiGeneration->description }}</p>
+                                            <p class="mt-1 text-gray-700 whitespace-pre-wrap">{{ $product->latestAiDescription->content }}</p>
                                         </div>
                                     @endif
-                                    @if ($product->aiGeneration->usps)
+                                    @if ($product->latestAiUsp?->content)
                                         <div>
                                             <span class="font-semibold">Unique Selling Points:</span>
-                                            <p class="mt-1 text-gray-700 whitespace-pre-wrap">{{ $product->aiGeneration->usps }}</p>
+                                            <p class="mt-1 text-gray-700 whitespace-pre-wrap">{{ $product->latestAiUsp->content }}</p>
                                         </div>
                                     @endif
-                                    @if ($product->aiGeneration->faq)
+                                    @if ($product->latestAiFaq?->content)
                                         <div>
                                             <span class="font-semibold">FAQ:</span>
-                                            <p class="mt-1 text-gray-700 whitespace-pre-wrap">{{ $product->aiGeneration->faq }}</p>
+                                            <p class="mt-1 text-gray-700 whitespace-pre-wrap">{{ $product->latestAiFaq->content }}</p>
                                         </div>
                                     @endif
                                     <div class="text-xs text-gray-500">
-                                        AI summary last updated {{ $product->aiGeneration->updated_at?->diffForHumans() ?? 'N/A' }}
+                                        AI summary last updated {{ $product->latestAiDescriptionSummary?->created_at?->diffForHumans() ?? 'N/A' }}
                                     </div>
                                 </div>
                             @endif

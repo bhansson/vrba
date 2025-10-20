@@ -15,7 +15,7 @@ This repository ships with a Docker Compose setup that runs Laravel Octane on Sw
 Visit `http://localhost:8000` for Octane and `http://localhost:5173` for the Vite dev server.
 
 ## Running Supporting Services
-- **Queue worker**: `docker compose up queue -d` (uses `php artisan queue:work`)
+- **Queue worker**: `docker compose up queue -d` (runs `php artisan horizon`)
 - **Scheduler**: `docker compose up scheduler -d` (runs `php artisan schedule:work`)
 - **Logs / shell access**: `docker compose exec octane bash`
 - **Supabase Postgres**: `docker compose up supabase-db -d` (bundled development database)
@@ -47,8 +47,8 @@ docker compose exec vite npm run build
 
 ## Product Browser & AI Summaries
 - Navigate to `/products` to browse all imported products for the current team. Each row expands to show full product details.
-- Click “Generate Summary” beside a product to create a short marketing snippet using OpenAI (defaults to model `gpt-5`). Summaries appear inline when the API responds.
-- Configure your API key in `.env` (`OPENAI_API_KEY`, optional `OPENAI_MODEL`, `OPENAI_BASE_URL`). Without a key the button will show an error.
+- Click “Generate Summary” beside a product to queue a short marketing snippet generation using OpenAI (defaults to model `gpt-5`). Track progress under **AI Jobs** (navigation) while Horizon works the queue.
+- Configure your API key in `.env` (`OPENAI_API_KEY`, optional `OPENAI_MODEL`, `OPENAI_BASE_URL`). Without a key the button will show an error when you attempt to enqueue a job.
 
 ## Supabase Database (Self-Hosted)
 - A local Supabase Postgres instance is bundled as `supabase-db` in `docker-compose.yml`. Start it with `docker compose up supabase-db -d`. Default credentials live in `.env` (`SUPABASE_DB_USER=postgres`, `SUPABASE_DB_PASSWORD=supabase`).

@@ -17,4 +17,7 @@ Route::middleware([
 
     Route::view('/products', 'products.index')
         ->name('products.index');
+
+    Route::view('/ai-jobs', 'ai-jobs.index')
+        ->name('ai-jobs.index');
 });

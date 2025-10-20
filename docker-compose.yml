@@ -33,7 +33,7 @@ services:
         PGID: ${PGID:-1000}
     image: vrba/octane:local
     container_name: vrba-queue
-    command: ["php", "artisan", "queue:work", "--verbose", "--tries=1", "--timeout=90"]
+    command: ["php", "artisan", "horizon"]
     environment:
       APP_ENV: ${APP_ENV:-local}
       APP_DEBUG: ${APP_DEBUG:-true}

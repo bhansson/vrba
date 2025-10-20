@@ -34,8 +34,33 @@ class Product extends Model
         return $this->belongsTo(Team::class);
     }
 
-    public function aiGeneration()
+    public function aiDescriptionSummaries()
     {
-        return $this->hasOne(ProductAiGeneration::class, 'product_sku', 'sku');
+        return $this->hasMany(ProductAiDescriptionSummary::class)->latest();
+    }
+
+    public function latestAiDescriptionSummary()
+    {
+        return $this->hasOne(ProductAiDescriptionSummary::class)->latestOfMany();
+    }
+
+    public function latestAiDescription()
+    {
+        return $this->hasOne(ProductAiDescription::class)->latestOfMany();
+    }
+
+    public function latestAiUsp()
+    {
+        return $this->hasOne(ProductAiUsp::class)->latestOfMany();
+    }
+
+    public function latestAiFaq()
+    {
+        return $this->hasOne(ProductAiFaq::class)->latestOfMany();
+    }
+
+    public function latestAiReviewSummary()
+    {
+        return $this->hasOne(ProductAiReviewSummary::class)->latestOfMany();
     }
 }
