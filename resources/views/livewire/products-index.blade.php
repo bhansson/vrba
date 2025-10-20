@@ -58,21 +58,25 @@
         <div class="bg-white shadow sm:rounded-lg">
             <div class="divide-y divide-gray-200">
                 <div class="hidden px-4 py-3 bg-gray-50 text-xs font-semibold uppercase text-gray-600 sm:grid sm:grid-cols-12">
-                    <div class="col-span-6">Title</div>
-                    <div class="col-span-4">Summary</div>
+                    <div class="col-span-8">Title</div>
+                    <div class="col-span-2">Last AI Generation</div>
                     <div class="col-span-2 text-right">Actions</div>
                 </div>
 
                 @forelse ($products as $product)
                     @php
-                        $summaryStatusMessage = $summaryStatuses[$product->id] ?? null;
-                        $summaryErrorMessage = $summaryErrors[$product->id] ?? null;
-                        $isLoadingSummary = $loadingSummary[$product->id] ?? false;
-                        $summaryContent = $summaries[$product->id] ?? $product->latestAiDescriptionSummary?->content;
-                        $summaryQueued = ! empty($summaryStatusMessage);
+                        $latestGeneration = collect([
+                            ['label' => 'Summary', 'timestamp' => optional($product->latestAiDescriptionSummary)->updated_at],
+                            ['label' => 'Description', 'timestamp' => optional($product->latestAiDescription)->updated_at],
+                            ['label' => 'USPs', 'timestamp' => optional($product->latestAiUsp)->updated_at],
+                            ['label' => 'FAQ', 'timestamp' => optional($product->latestAiFaq)->updated_at],
+                        ])
+                            ->filter(fn ($item) => $item['timestamp'])
+                            ->sortByDesc('timestamp')
+                            ->first();
                     @endphp
                     <div wire:key="product-{{ $product->id }}" class="flex flex-col gap-4 px-4 py-5 transition-colors sm:grid sm:grid-cols-12 sm:items-center hover:bg-gray-50">
-                        <div class="sm:col-span-6">
+                        <div class="sm:col-span-8">
                             <div class="text-sm font-semibold text-gray-900">
                                 {{ $product->title ?: 'Untitled product' }}
                             </div>
@@ -87,36 +91,16 @@
                                 </div>
                             @endif
                         </div>
-                        <div class="sm:col-span-4 text-sm text-gray-700 space-y-1">
-                            @if ($isLoadingSummary)
-                                <p class="text-gray-500">Queueing summary request…</p>
-                            @elseif (! empty($summaryErrorMessage))
-                                <p class="text-red-600" aria-live="polite">{{ $summaryErrorMessage }}</p>
-                            @elseif ($summaryQueued)
-                                <p class="text-indigo-600" aria-live="polite">{{ $summaryStatusMessage }}</p>
-                            @elseif (! empty($summaryContent))
-                                <p>{{ Str::limit($summaryContent, 160) }}</p>
-                            @elseif ($product->description)
-                                <p>{{ Str::limit($product->description, 160) }}</p>
+                        <div class="sm:col-span-2 text-sm text-gray-700">
+                            @if ($latestGeneration)
+                                <p aria-live="polite">
+                                    {{ $latestGeneration['label'] }} generated {{ $latestGeneration['timestamp']->diffForHumans() }}
+                                </p>
                             @else
-                                <p class="text-gray-500">No summary generated yet.</p>
+                                <p class="text-gray-500">Never generated</p>
                             @endif
                         </div>
                         <div class="sm:col-span-2 flex flex-col gap-2 sm:items-end">
-                            <x-button type="button"
-                                wire:click="summarizeProduct({{ $product->id }})"
-                                wire:loading.attr="disabled"
-                                wire:target="summarizeProduct({{ $product->id }})"
-                                :disabled="$summaryQueued">
-                                <span wire:loading.remove wire:target="summarizeProduct({{ $product->id }})">
-                                    @if ($summaryQueued)
-                                        Queued
-                                    @else
-                                        Generate Summary
-                                    @endif
-                                </span>
-                                <span wire:loading wire:target="summarizeProduct({{ $product->id }})">Queueing…</span>
-                            </x-button>
                             <a href="{{ route('products.show', $product) }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">
                                 View details
                                 <span class="sr-only">for {{ $product->title ?: 'Untitled product' }}</span>
