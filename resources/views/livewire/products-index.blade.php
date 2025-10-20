@@ -77,14 +77,33 @@
                                     SKU: {{ $product->sku ?: '—' }}
                                 </div>
                             </div>
+                            @php
+                                $summaryStatusMessage = $summaryStatuses[$product->id] ?? null;
+                                $summaryErrorMessage = $summaryErrors[$product->id] ?? null;
+                                $summaryQueued = ! empty($summaryStatusMessage);
+                            @endphp
                             <div class="col-span-4 flex justify-end">
-                                <x-button type="button"
-                                    wire:click.stop="summarizeProduct({{ $product->id }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="summarizeProduct({{ $product->id }})">
-                                    <span wire:loading.remove wire:target="summarizeProduct({{ $product->id }})">Generate Summary</span>
-                                    <span wire:loading wire:target="summarizeProduct({{ $product->id }})">Queueing…</span>
-                                </x-button>
+                                <div class="text-right space-y-1">
+                                    <x-button type="button"
+                                        wire:click.stop="summarizeProduct({{ $product->id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="summarizeProduct({{ $product->id }})"
+                                        :disabled="$summaryQueued">
+                                        <span wire:loading.remove wire:target="summarizeProduct({{ $product->id }})">
+                                            @if ($summaryQueued)
+                                                Queued
+                                            @else
+                                                Generate
+                                            @endif
+                                        </span>
+                                        <span wire:loading wire:target="summarizeProduct({{ $product->id }})">Queueing…</span>
+                                    </x-button>
+                                    @if ($summaryQueued)
+                                        <p class="text-xs text-indigo-600" aria-live="polite">{{ $summaryStatusMessage }}</p>
+                                    @elseif (! empty($summaryErrorMessage))
+                                        <p class="text-xs text-red-600" aria-live="polite">{{ $summaryErrorMessage }}</p>
+                                    @endif
+                                </div>
                             </div>
                         </summary>
                         <div class="px-6 pb-6 bg-gray-50 text-sm text-gray-700 space-y-3">
@@ -136,7 +155,7 @@
                                 @elseif ($product->latestAiDescriptionSummary?->content)
                                     <p class="text-gray-800">{{ $product->latestAiDescriptionSummary->content }}</p>
                                 @else
-                                    <p class="text-gray-500 text-sm">Click “Generate Summary” to create a marketing snippet for this product.</p>
+                                    <p class="text-gray-500 text-sm">Click “Generate” to create a marketing snippet for this product.</p>
                                 @endif
                             </div>
                             @if ($product->latestAiDescription || $product->latestAiUsp || $product->latestAiFaq)

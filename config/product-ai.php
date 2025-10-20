@@ -36,12 +36,11 @@ return [
             'prompts' => [
                 'system' => 'You are a product marketing assistant who writes short, high-converting product summaries.',
                 'user' => <<<'PROMPT'
-Create a concise, high-converting marketing summary (maximum 60 words) for the product below. Highlight what makes it stand out and keep the tone upbeat yet trustworthy. Mention the price only if a numeric value is provided.
+Create a concise, high-converting marketing summary (maximum 60 words) for the product below. Highlight what makes it stand out and keep the tone upbeat yet trustworthy.
 
 Title: {{ title }}
-Description: {{ description_excerpt }}
-SKU: {{ sku }}
-Price: {{ price }}
+GTIN: {{ gtin }}
+Product description: {{ description_excerpt }}
 PROMPT,
                 'description_excerpt_limit' => 400,
             ],
@@ -53,17 +52,15 @@ PROMPT,
             'job' => GenerateProductDescription::class,
             'model' => ProductAiDescription::class,
             'meta_key' => 'description_record_id',
-            'history_limit' => 5,
+            'history_limit' => 10,
             'prompts' => [
                 'system' => 'You are an ecommerce conversion copywriter who crafts persuasive, human-sounding product descriptions.',
                 'user' => <<<'PROMPT'
-Write a compelling product description between 130 and 180 words based on the details below. Focus on benefits, address likely objections, and finish with a short call to action. Use short paragraphs and keep formatting plain text.
+Write a compelling product description between 100 and 500 words based on the details below. Focus on benefits, address likely objections. Use short paragraphs and keep formatting plain text.
 
 Title: {{ title }}
-Current description: {{ description_excerpt }}
-SKU: {{ sku }}
-Price: {{ price }}
-URL: {{ url }}
+GTIN: {{ gtin }}
+Product description: {{ description_excerpt }}
 PROMPT,
                 'description_excerpt_limit' => 1200,
             ],
@@ -75,16 +72,15 @@ PROMPT,
             'job' => GenerateProductUsps::class,
             'model' => ProductAiUsp::class,
             'meta_key' => 'usp_record_id',
-            'history_limit' => 5,
+            'history_limit' => 10,
             'prompts' => [
                 'system' => 'You are a conversion-focused marketer skilled at extracting concrete unique selling points from product data.',
                 'user' => <<<'PROMPT'
 List exactly four concise unique selling points for the product below. Each USP should be a single sentence fragment of fewer than 20 words. Avoid generic phrases like "high quality" or "great value" unless you have supporting detail.
 
 Title: {{ title }}
-Summary of features: {{ description_excerpt }}
-SKU: {{ sku }}
-Price: {{ price }}
+GTIN: {{ gtin }}
+Product description: {{ description_excerpt }}
 PROMPT,
                 'description_excerpt_limit' => 800,
             ],
@@ -96,7 +92,7 @@ PROMPT,
             'job' => GenerateProductFaq::class,
             'model' => ProductAiFaq::class,
             'meta_key' => 'faq_record_id',
-            'history_limit' => 5,
+            'history_limit' => 10,
             'prompts' => [
                 'system' => 'You draft helpful pre-sale FAQ entries for ecommerce products.',
                 'user' => <<<'PROMPT'
@@ -112,9 +108,8 @@ Q: Question 3
 A: Answer 3
 
 Title: {{ title }}
-Product details: {{ description_excerpt }}
-SKU: {{ sku }}
-Price: {{ price }}
+GTIN: {{ gtin }}
+Product description: {{ description_excerpt }}
 PROMPT,
                 'description_excerpt_limit' => 1200,
             ],

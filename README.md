@@ -47,7 +47,7 @@ docker compose exec vite npm run build
 
 ## Product Browser & AI Summaries
 - Navigate to `/products` to browse all imported products for the current team. Each row expands to show full product details.
-- Click “Generate Summary” beside a product to queue a short marketing snippet generation using OpenAI (defaults to model `gpt-5`). Track progress under **AI Jobs** (navigation) while Horizon works the queue.
+- Click “Generate” beside a product to queue a short marketing snippet generation using OpenAI (defaults to model `gpt-5`). Track progress under **AI Jobs** (navigation) while Horizon works the queue.
 - Configure your API key in `.env` (`OPENAI_API_KEY`, optional `OPENAI_MODEL`, `OPENAI_BASE_URL`). Without a key the button will show an error when you attempt to enqueue a job.
 
 ## Supabase Database (Self-Hosted)
