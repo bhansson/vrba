@@ -280,16 +280,16 @@
                                                                 <span class="text-xs text-gray-500">
                                                                     {{ $history->created_at ? $history->created_at->format('M j, Y H:i') : 'Unknown' }}
                                                                 </span>
-                                                                <x-secondary-button
+                                                                <button
                                                                         type="button"
                                                                         wire:click="promoteGeneration('{{ $promptType }}', {{ $history->id }})"
                                                                         wire:loading.attr="disabled"
                                                                         wire:target="promoteGeneration"
+                                                                        class="inline-flex items-center gap-1 border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-500 transition hover:border-gray-300 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-200 disabled:opacity-50"
                                                                 >
-                                                                    <span wire:loading.remove
-                                                                          wire:target="promoteGeneration">Promote to latest</span>
+                                                                    <span wire:loading.remove wire:target="promoteGeneration">Promote</span>
                                                                     <span wire:loading wire:target="promoteGeneration">Promoting…</span>
-                                                                </x-secondary-button>
+                                                                </button>
                                                             </div>
                                                             @php
                                                                 $rawContent = $history->content ?? '';
