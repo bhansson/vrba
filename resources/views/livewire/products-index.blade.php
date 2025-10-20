@@ -6,7 +6,7 @@
             <div>
                 <h1 class="text-2xl font-semibold text-gray-800">Products</h1>
                 <p class="mt-1 text-sm text-gray-600">
-                    Search your catalog by title, SKU, GTIN, feed, or description.
+                    Search your catalog by title, SKU, or GTIN.
                 </p>
             </div>
 
@@ -17,6 +17,7 @@
                         placeholder="Start typing to search products…"
                         wire:model.live.debounce.400ms="search"
                         class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm pl-10 pr-10 py-2"
+                        aria-label="Search products"
                     />
                     <svg class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 013.978 9.25l3.636 3.636a.75.75 0 11-1.06 1.06l-3.636-3.636A5.5 5.5 0 119 3.5zm0 1.5a4 4 0 100 8 4 4 0 000-8z" clip-rule="evenodd" />
@@ -34,7 +35,7 @@
 
                 <div class="flex items-center space-x-2 text-sm text-gray-600 sm:justify-end">
                     <span>Show</span>
-                    <select wire:model.number="perPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                    <select wire:model.number="perPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" aria-label="Results per page">
                         <option value="10">10</option>
                         <option value="15">15</option>
                         <option value="25">25</option>

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Products;
 
-use App\Jobs\GenerateProductDescriptionSummary;
+use App\Jobs\BaseProductAiJob;
 use App\Livewire\ProductsIndex;
 use App\Models\Product;
 use App\Models\ProductAiJob;
@@ -42,17 +42,28 @@ class ProductSummaryQueueTest extends TestCase
             ->call('summarizeProduct', $product->id)
             ->assertHasNoErrors();
 
-        $this->assertDatabaseHas('product_ai_jobs', [
-            'product_id' => $product->id,
-            'prompt_type' => ProductAiJob::PROMPT_DESCRIPTION_SUMMARY,
-            'status' => ProductAiJob::STATUS_QUEUED,
-        ]);
+        $promptTypes = collect(config('product-ai.actions.generate_summary', []))
+            ->filter()
+            ->unique()
+            ->values();
 
-        Queue::assertPushed(GenerateProductDescriptionSummary::class, function (GenerateProductDescriptionSummary $job) use ($product): bool {
-            $jobRecord = ProductAiJob::find($job->productAiJobId);
+        $promptTypes->each(function (string $promptType) use ($product): void {
+            $this->assertDatabaseHas('product_ai_jobs', [
+                'product_id' => $product->id,
+                'prompt_type' => $promptType,
+                'status' => ProductAiJob::STATUS_QUEUED,
+            ]);
 
-            return $jobRecord?->product_id === $product->id
-                && $jobRecord->prompt_type === ProductAiJob::PROMPT_DESCRIPTION_SUMMARY;
+            $jobClass = data_get(config('product-ai.generations.'.$promptType, []), 'job');
+
+            $this->assertIsString($jobClass, 'Expected job class to be configured for '.$promptType);
+
+            Queue::assertPushed($jobClass, function (BaseProductAiJob $job) use ($product, $promptType): bool {
+                $jobRecord = ProductAiJob::find($job->productAiJobId);
+
+                return $jobRecord?->product_id === $product->id
+                    && $jobRecord->prompt_type === $promptType;
+            });
         });
     }
 }

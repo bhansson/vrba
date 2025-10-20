@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Jobs\GenerateProductDescriptionSummary;
 use App\Models\Product;
 use App\Models\ProductAiJob;
 use Illuminate\Database\Eloquent\Builder;
@@ -65,12 +64,7 @@ class ProductsIndex extends Component
 
                             $inner->where('title', $operator, $like)
                                 ->orWhere('sku', $operator, $like)
-                                ->orWhere('gtin', $operator, $like)
-                                ->orWhere('description', $operator, $like)
-                                ->orWhere('url', $operator, $like)
-                                ->orWhereHas('feed', function ($feedQuery) use ($operator, $like) {
-                                    $feedQuery->where('name', $operator, $like);
-                                });
+                                ->orWhere('gtin', $operator, $like);
                         });
                     }
                 });
@@ -118,6 +112,11 @@ class ProductsIndex extends Component
         $this->loadingSummary[$productId] = true;
 
         try {
+            $promptTypes = collect(config('product-ai.actions.generate_summary', []))
+                ->filter(static fn ($value) => is_string($value) && $value !== '')
+                ->unique()
+                ->values();
+
             if (! config('services.openai.api_key')) {
                 throw new \RuntimeException('OpenAI API key is not configured.');
             }
@@ -126,20 +125,48 @@ class ProductsIndex extends Component
                 throw new \RuntimeException('Product is missing an SKU, cannot queue summary.');
             }
 
-            $jobRecord = ProductAiJob::create([
-                'team_id' => $team->id,
-                'product_id' => $product->id,
-                'sku' => $product->sku,
-                'prompt_type' => ProductAiJob::PROMPT_DESCRIPTION_SUMMARY,
-                'status' => ProductAiJob::STATUS_QUEUED,
-                'progress' => 0,
-                'queued_at' => now(),
-            ]);
+            if ($promptTypes->isEmpty()) {
+                throw new \RuntimeException('No AI generations are configured for this action.');
+            }
 
-            GenerateProductDescriptionSummary::dispatch($jobRecord->id);
+            $queuedLabels = [];
+
+            foreach ($promptTypes as $promptType) {
+                $generationConfig = config('product-ai.generations.'.$promptType);
+
+                if (! is_array($generationConfig) || empty($generationConfig)) {
+                    throw new \RuntimeException('Missing AI generation configuration for prompt type: '.$promptType);
+                }
+
+                $jobClass = data_get($generationConfig, 'job');
+
+                if (! is_string($jobClass) || ! class_exists($jobClass)) {
+                    throw new \RuntimeException('Invalid job class for prompt type: '.$promptType);
+                }
+
+                $jobRecord = ProductAiJob::create([
+                    'team_id' => $team->id,
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'prompt_type' => $promptType,
+                    'status' => ProductAiJob::STATUS_QUEUED,
+                    'progress' => 0,
+                    'queued_at' => now(),
+                ]);
+
+                $jobClass::dispatch($jobRecord->id);
+
+                $queuedLabels[] = data_get($generationConfig, 'label', Str::headline($promptType));
+            }
 
             unset($this->summaries[$productId]);
-            $this->summaryStatuses[$productId] = 'Summary request queued. Track progress on the AI Jobs page.';
+
+            if (! empty($queuedLabels)) {
+                $labelList = collect($queuedLabels)->unique()->values()->join(', ', ' and ');
+                $this->summaryStatuses[$productId] = 'Queued AI jobs: '.$labelList.'. Track progress on the AI Jobs page.';
+            } else {
+                $this->summaryStatuses[$productId] = 'AI jobs queued. Track progress on the AI Jobs page.';
+            }
         } catch (\Throwable $e) {
             $this->summaryErrors[$productId] = $e->getMessage();
         } finally {
