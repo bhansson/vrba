@@ -216,18 +216,13 @@
                                     >
                                         <div class="space-y-2">
                                             <h3 class="text-sm font-semibold text-gray-900">{{ $generation['label'] }}</h3>
-                                            @if ($generation['key'] === 'summary')
-                                                <p class="text-sm text-gray-600">
-                                                    Generate a marketing-ready summary for this product.
-                                                </p>
-                                            @endif
                                             <div class="space-y-2">
                                                 <x-button type="button"
                                                           wire:click="queueGeneration('{{ $promptType }}')"
                                                           wire:loading.attr="disabled"
                                                           wire:target="queueGeneration">
                                                     <span wire:loading.remove
-                                                          wire:target="queueGeneration">Generate {{ $generation['label'] }}</span>
+                                                          wire:target="queueGeneration">Generate</span>
                                                     <span wire:loading wire:target="queueGeneration">Processing…</span>
                                                 </x-button>
 
