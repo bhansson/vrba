@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
@@ -20,6 +21,7 @@ class Team extends JetstreamTeam
      */
     protected $fillable = [
         'name',
+        'public_hash',
         'personal_team',
     ];
 
@@ -44,6 +46,24 @@ class Team extends JetstreamTeam
         return [
             'personal_team' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Team $team): void {
+            if (! $team->public_hash) {
+                $team->public_hash = static::generateUniquePublicHash();
+            }
+        });
+    }
+
+    protected static function generateUniquePublicHash(): string
+    {
+        do {
+            $hash = Str::lower(Str::random(32));
+        } while (static::query()->where('public_hash', $hash)->exists());
+
+        return $hash;
     }
 
     public function productFeeds()

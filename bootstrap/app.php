@@ -1,5 +1,7 @@
 <?php
 
+use App\Console\Commands\GenerateProductJsonCommand;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
     })
+    ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('products:generate-public-json')->everyFiveMinutes();
+    })
+    ->withCommands([
+        GenerateProductJsonCommand::class,
+    ])
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();

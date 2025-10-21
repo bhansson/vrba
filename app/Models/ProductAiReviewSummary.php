@@ -22,6 +22,8 @@ class ProductAiReviewSummary extends Model
         'meta' => 'array',
     ];
 
+    protected $touches = ['product'];
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
