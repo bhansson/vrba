@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -58,7 +57,7 @@ return new class extends Migration
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->string('sku', 191);
-            $table->text('content');
+            $table->json('content');
             $table->json('meta')->nullable();
             $table->timestamps();
 
@@ -70,7 +69,7 @@ return new class extends Migration
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->string('sku', 191);
-            $table->text('content');
+            $table->json('content');
             $table->json('meta')->nullable();
             $table->timestamps();
 

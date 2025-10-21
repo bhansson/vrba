@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Product;
 use App\Models\ProductAiJob;
 use App\Models\Team;
+use App\Support\ProductAiContentParser;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
@@ -110,8 +111,7 @@ class GenerateProductJsonCommand extends Command
             }
 
             $aiPayload[$promptType] = [
-                'content' => $record->content,
-                'meta' => $record->meta ?? [],
+                'content' => $this->normalizePayloadContent($promptType, $record->content),
                 'updated_at' => optional($record->updated_at)->toIso8601String(),
             ];
         }
@@ -177,6 +177,19 @@ class GenerateProductJsonCommand extends Command
         return public_path('edge'.DIRECTORY_SEPARATOR.$team->public_hash);
     }
 
+    protected function normalizePayloadContent(string $promptType, mixed $content): mixed
+    {
+        if ($promptType === ProductAiJob::PROMPT_USPS) {
+            return ProductAiContentParser::parseUsps($content);
+        }
+
+        if ($promptType === ProductAiJob::PROMPT_FAQ) {
+            return ProductAiContentParser::parseFaq($content);
+        }
+
+        return is_string($content) ? trim($content) : $content;
+    }
+
     protected function ensureTeamHash(Team $team): Team
     {
         if ($team->public_hash) {
@@ -193,7 +206,7 @@ class GenerateProductJsonCommand extends Command
     protected function generateUniqueTeamHash(): string
     {
         do {
-            $hash = Str::lower(Str::random(32));
+            $hash = Str::uuid()->toString();
         } while (Team::query()->where('public_hash', $hash)->exists());
 
         return $hash;

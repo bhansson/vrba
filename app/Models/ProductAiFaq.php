@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\ProductAiContentParser;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +25,21 @@ class ProductAiFaq extends Model
     ];
 
     protected $touches = ['product'];
+
+    protected function content(): Attribute
+    {
+        return Attribute::make(
+            get: static function ($value) {
+                return ProductAiContentParser::parseFaq($value);
+            },
+            set: static function ($value) {
+                return json_encode(
+                    ProductAiContentParser::parseFaq($value),
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                );
+            },
+        );
+    }
 
     public function product(): BelongsTo
     {

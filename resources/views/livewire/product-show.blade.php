@@ -115,7 +115,7 @@
                             'content' => $generationContent[$summaryPromptType] ?? $latestSummaryRecord?->content,
                             'generated_at' => $latestSummaryRecord?->created_at,
                             'recorded_at' => $latestSummaryRecord?->updated_at,
-                            'always_show' => true,
+                            'model' => data_get($latestSummaryRecord?->meta, 'model'),
                         ],
                         [
                             'key' => 'description',
@@ -124,6 +124,7 @@
                             'content' => $product->latestAiDescription?->content,
                             'generated_at' => $product->latestAiDescription?->created_at,
                             'recorded_at' => $product->latestAiDescription?->updated_at,
+                            'model' => data_get($product->latestAiDescription?->meta, 'model'),
                         ],
                         [
                             'key' => 'usps',
@@ -132,6 +133,7 @@
                             'content' => $product->latestAiUsp?->content,
                             'generated_at' => $product->latestAiUsp?->created_at,
                             'recorded_at' => $product->latestAiUsp?->updated_at,
+                            'model' => data_get($product->latestAiUsp?->meta, 'model'),
                         ],
                         [
                             'key' => 'faq',
@@ -140,17 +142,28 @@
                             'content' => $product->latestAiFaq?->content,
                             'generated_at' => $product->latestAiFaq?->created_at,
                             'recorded_at' => $product->latestAiFaq?->updated_at,
+                            'model' => data_get($product->latestAiFaq?->meta, 'model'),
                         ],
-                    ])->filter(function ($generation) {
-                        if (! empty($generation['always_show'])) {
-                            return true;
+                    ])->map(function ($generation) {
+                        $hasContent = false;
+
+                        if (is_array($generation['content'])) {
+                            $hasContent = collect($generation['content'])
+                                ->filter(function ($item) {
+                                    if (is_array($item)) {
+                                        return collect($item)->filter()->isNotEmpty();
+                                    }
+
+                                    return trim((string) $item) !== '';
+                                })
+                                ->isNotEmpty();
+                        } elseif (is_string($generation['content'])) {
+                            $hasContent = trim($generation['content']) !== '';
                         }
 
-                        if (! is_string($generation['content'])) {
-                            return false;
-                        }
+                        $generation['has_content'] = $hasContent;
 
-                        return trim($generation['content']) !== '';
+                        return $generation;
                     })->values();
 
                     $latestGenerationUpdatedAt = $aiGenerations
@@ -252,16 +265,80 @@
                                                 @endif
                                             </div>
                                         @else
-                                            @if ($generation['content'])
-                                                <p class="whitespace-pre-wrap text-gray-700">{{ $generation['content'] }}</p>
-                                            @else
-                                                <p class="text-gray-500">No content generated yet. Use the button above
-                                                    to queue AI jobs.</p>
-                                            @endif
+                                            @switch($generation['key'])
+                                                @case('usps')
+                                                    @php
+                                                        $usps = collect(is_array($generation['content']) ? $generation['content'] : [])
+                                                            ->map(fn ($value) => trim(is_array($value) ? implode(' ', $value) : (string) $value))
+                                                            ->filter()
+                                                            ->values();
+                                                    @endphp
+                                                    @if ($usps->isNotEmpty())
+                                                        <ul class="list-disc space-y-2 pl-5 text-gray-700">
+                                                            @foreach ($usps as $usp)
+                                                                <li>{{ $usp }}</li>
+                                                            @endforeach
+                                                        </ul>
+                                                    @else
+                                                        <p class="text-gray-500">No unique selling points generated yet.
+                                                            Use the button above to queue AI jobs.</p>
+                                                    @endif
+                                                    @break
+
+                                                @case('faq')
+                                                    @php
+                                                        $faqEntries = collect(is_array($generation['content']) ? $generation['content'] : [])
+                                                            ->map(function ($entry) {
+                                                                if (is_array($entry)) {
+                                                                    return [
+                                                                        'question' => trim((string) ($entry['question'] ?? '')),
+                                                                        'answer' => trim((string) ($entry['answer'] ?? '')),
+                                                                    ];
+                                                                }
+
+                                                                return [
+                                                                    'question' => '',
+                                                                    'answer' => trim((string) $entry),
+                                                                ];
+                                                            })
+                                                            ->filter(function ($entry) {
+                                                                return ($entry['question'] !== '') || ($entry['answer'] !== '');
+                                                            })
+                                                            ->values();
+                                                    @endphp
+                                                    @if ($faqEntries->isNotEmpty())
+                                                        <div class="space-y-4 text-gray-700">
+                                                            @foreach ($faqEntries as $faq)
+                                                                <div class="space-y-1">
+                                                                    <p class="font-medium text-gray-900">Q: {{ $faq['question'] ?: 'Question' }}</p>
+                                                                    <p>A: {{ $faq['answer'] ?: 'Answer forthcoming.' }}</p>
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
+                                                    @else
+                                                        <p class="text-gray-500">No FAQ entries generated yet. Use the button above to queue AI jobs.</p>
+                                                    @endif
+                                                    @break
+
+                                                @default
+                                                    @if ($generation['content'])
+                                                        <p class="whitespace-pre-wrap text-gray-700">{{ $generation['content'] }}</p>
+                                                    @else
+                                                        <p class="text-gray-500">No content generated yet. Use the button above
+                                                            to queue AI jobs.</p>
+                                                    @endif
+                                            @endswitch
                                         @endif
 
                                             <p class="text-xs text-gray-500">
-                                                Generated {{ $product->created_at->diffForHumans() }}
+                                                @if ($generation['recorded_at'])
+                                                    Generated {{ $generation['recorded_at']->diffForHumans() }}
+                                                @else
+                                                    Generated date unavailable
+                                                @endif
+                                                @if (! empty($generation['model']))
+                                                    ({{ \Illuminate\Support\Str::upper($generation['model']) }})
+                                                @endif
                                             </p>
 
                                         @if ($historyItems->isNotEmpty())
@@ -288,11 +365,51 @@
                                                             </div>
                                                             @php
                                                                 $rawContent = $history->content ?? '';
+
+                                                                if (is_array($rawContent)) {
+                                                                    if ($promptType === \App\Models\ProductAiJob::PROMPT_USPS) {
+                                                                        $rawContent = collect($rawContent)
+                                                                            ->map(fn ($value) => '• '.trim(is_array($value) ? implode(' ', $value) : (string) $value))
+                                                                            ->filter()
+                                                                            ->implode("\n");
+                                                                    } elseif ($promptType === \App\Models\ProductAiJob::PROMPT_FAQ) {
+                                                                        $rawContent = collect($rawContent)
+                                                                            ->map(function ($entry) {
+                                                                                if (is_array($entry)) {
+                                                                                    $question = trim((string) ($entry['question'] ?? 'Question'));
+                                                                                    $answer = trim((string) ($entry['answer'] ?? 'Answer forthcoming.'));
+                                                                                } else {
+                                                                                    $question = 'Question';
+                                                                                    $answer = trim((string) $entry) ?: 'Answer forthcoming.';
+                                                                                }
+
+                                                                                return "Q: {$question}\nA: {$answer}";
+                                                                            })
+                                                                            ->filter()
+                                                                            ->implode("\n\n");
+                                                                    } else {
+                                                                        $rawContent = json_encode($rawContent, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                                                                    }
+                                                                }
+
+                                                                $rawContent = (string) $rawContent;
                                                                 $fullContent = preg_replace('/^\s+/u', '', $rawContent) ?? '';
                                                                 $truncatedContent = \Illuminate\Support\Str::limit($fullContent, 100, '');
                                                                 $hasMoreContent = \Illuminate\Support\Str::length($fullContent) > \Illuminate\Support\Str::length($truncatedContent);
+                                                                $historyModel = data_get($history->meta, 'model');
+                                                                $historyTimestamp = $history->updated_at ?? $history->created_at;
                                                             @endphp
                                                             <div class="space-y-2">
+                                                                <p class="text-xs text-gray-500">
+                                                                    @if ($historyTimestamp)
+                                                                        Generated {{ $historyTimestamp->diffForHumans() }}
+                                                                    @else
+                                                                        Generated date unavailable
+                                                                    @endif
+                                                                    @if ($historyModel)
+                                                                        ({{ \Illuminate\Support\Str::upper($historyModel) }})
+                                                                    @endif
+                                                                </p>
                                                                 <p class="whitespace-pre-wrap text-gray-700" x-show="!isExpanded">{{ $hasMoreContent ? \Illuminate\Support\Str::of($truncatedContent)->trim()->append('…') : $fullContent }}</p>
                                                                 @if ($hasMoreContent)
                                                                     <template x-if="isExpanded">

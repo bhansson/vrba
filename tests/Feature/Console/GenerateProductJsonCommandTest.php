@@ -4,6 +4,8 @@ namespace Tests\Feature\Console;
 
 use App\Models\Product;
 use App\Models\ProductAiDescriptionSummary;
+use App\Models\ProductAiFaq;
+use App\Models\ProductAiUsp;
 use App\Models\Team;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -46,6 +48,34 @@ class GenerateProductJsonCommandTest extends TestCase
                 'content' => 'Generated summary content',
             ]);
 
+        ProductAiUsp::create([
+            'team_id' => $team->id,
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'content' => [
+                'Ships within 24 hours',
+                'Premium materials that last',
+            ],
+            'meta' => null,
+        ]);
+
+        ProductAiFaq::create([
+            'team_id' => $team->id,
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'content' => [
+                [
+                    'question' => 'Does it include a warranty?',
+                    'answer' => 'Yes, it includes a 2-year manufacturer warranty.',
+                ],
+                [
+                    'question' => 'Is international shipping available?',
+                    'answer' => 'We ship worldwide with tracked delivery.',
+                ],
+            ],
+            'meta' => null,
+        ]);
+
         $product->refresh();
 
         $this->artisan('products:generate-public-json')
@@ -59,6 +89,26 @@ class GenerateProductJsonCommandTest extends TestCase
         $this->assertSame($product->sku, $payload['sku']);
         $this->assertSame($team->public_hash, $payload['team_hash']);
         $this->assertSame($summary->content, $payload['ai']['description_summary']['content']);
+        $this->assertArrayNotHasKey('meta', $payload['ai']['description_summary']);
+        $this->assertSame(
+            ['Ships within 24 hours', 'Premium materials that last'],
+            $payload['ai']['usps']['content']
+        );
+        $this->assertArrayNotHasKey('meta', $payload['ai']['usps']);
+        $this->assertSame(
+            [
+                [
+                    'question' => 'Does it include a warranty?',
+                    'answer' => 'Yes, it includes a 2-year manufacturer warranty.',
+                ],
+                [
+                    'question' => 'Is international shipping available?',
+                    'answer' => 'We ship worldwide with tracked delivery.',
+                ],
+            ],
+            $payload['ai']['faq']['content']
+        );
+        $this->assertArrayNotHasKey('meta', $payload['ai']['faq']);
     }
 
     public function test_it_skips_unchanged_products(): void

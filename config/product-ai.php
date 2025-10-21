@@ -76,7 +76,17 @@ PROMPT,
             'prompts' => [
                 'system' => 'You are a conversion-focused marketer skilled at extracting concrete unique selling points from product data.',
                 'user' => <<<'PROMPT'
-List exactly four concise unique selling points for the product below. Each USP should be a single sentence fragment of fewer than 20 words. Avoid generic phrases like "high quality" or "great value" unless you have supporting detail.
+List exactly four concise unique selling points for the product below. Each USP must be a single sentence fragment of fewer than 20 words. Avoid generic phrases like "high quality" or "great value" unless you have supporting detail. 
+Respond with ONLY a valid JSON document matching this structure exactly:
+
+[
+  "USP 1",
+  "USP 2",
+  "USP 3",
+  "USP 4"
+]
+
+Use double quotes for all strings, keep it on a single line if possible, and include nothing before or after the JSON.
 
 Title: {{ title }}
 GTIN: {{ gtin }}
@@ -96,16 +106,24 @@ PROMPT,
             'prompts' => [
                 'system' => 'You draft helpful pre-sale FAQ entries for ecommerce products.',
                 'user' => <<<'PROMPT'
-Create three customer-facing FAQ entries for the product below. For each entry, provide a concise question and a two-sentence answer. Address common concerns (fit, compatibility, materials, shipping, warranty, installation, etc.) when relevant. Use plain text with the format:
+Create three customer-facing FAQ entries for the product below. For each entry, provide a concise question and a two-sentence answer. Address common concerns (fit, compatibility, materials, shipping, warranty, installation, etc.) when relevant. Respond with ONLY a valid JSON document matching this structure exactly:
 
-Q: Question 1
-A: Answer 1
+[
+  {
+    "question": "Question 1",
+    "answer": "Answer 1"
+  },
+  {
+    "question": "Question 2",
+    "answer": "Answer 2"
+  },
+  {
+    "question": "Question 3",
+    "answer": "Answer 3"
+  }
+]
 
-Q: Question 2
-A: Answer 2
-
-Q: Question 3
-A: Answer 3
+Use double quotes for all strings, keep keys in the order shown, and include nothing before or after the JSON.
 
 Title: {{ title }}
 GTIN: {{ gtin }}

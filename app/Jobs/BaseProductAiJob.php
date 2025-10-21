@@ -4,8 +4,10 @@ namespace App\Jobs;
 
 use App\Models\Product;
 use App\Models\ProductAiJob;
+use App\Support\ProductAiContentParser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -84,6 +86,15 @@ abstract class BaseProductAiJob implements ShouldQueue
             $response = Http::withToken($apiKey)
                 ->timeout($timeout)
                 ->acceptJson()
+                ->withOptions([
+                    'http_version' => CURL_HTTP_VERSION_1_1,
+                ])
+                ->retry(
+                    3,
+                    500,
+                    fn (Throwable $exception) => $exception instanceof ConnectionException,
+                    throw: false
+                )
                 ->post($baseUrl.'/chat/completions', $payload);
 
             if ($response->failed()) {
@@ -117,11 +128,13 @@ abstract class BaseProductAiJob implements ShouldQueue
             ])->save();
 
             /** @var class-string<\Illuminate\Database\Eloquent\Model> $modelClass */
+            $contentPayload = ProductAiContentParser::normalizeForModel($modelClass, $content);
+
             $record = $modelClass::create([
                 'team_id' => $product->team_id,
                 'product_id' => $product->id,
                 'sku' => $product->sku,
-                'content' => $content,
+                'content' => $contentPayload,
                 'meta' => [
                     'model' => $payload['model'],
                     'job_id' => $jobRecord->id,
