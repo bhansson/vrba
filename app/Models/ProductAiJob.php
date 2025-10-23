@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class ProductAiJob extends Model
 {
@@ -51,5 +52,22 @@ class ProductAiJob extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function friendlyErrorMessage(): ?string
+    {
+        if ($this->status !== self::STATUS_FAILED) {
+            return null;
+        }
+
+        $error = Str::lower($this->last_error ?? '');
+
+        return match (true) {
+            $error === '' => 'The job stopped before it could finish.',
+            Str::contains($error, ['timeout', 'timed out']) => 'The job timed out before the AI responded.',
+            Str::contains($error, ['rate limit', 'too many requests', '429']) => 'We hit the AI rate limit; wait a moment and try again.',
+            Str::contains($error, ['unauthorized', '401', 'invalid api key']) => 'We could not reach the AI service with the current credentials.',
+            default => 'Something went wrong while generating the content. Please try again.',
+        };
     }
 }

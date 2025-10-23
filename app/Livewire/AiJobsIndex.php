@@ -44,6 +44,7 @@ class AiJobsIndex extends Component
                 ProductAiJob::STATUS_PROCESSING,
             ]),
             'failed' => $jobsQuery->where('status', ProductAiJob::STATUS_FAILED),
+            'completed' => $jobsQuery->where('status', ProductAiJob::STATUS_COMPLETED),
             default => null,
         };
 
@@ -63,6 +64,7 @@ class AiJobsIndex extends Component
     {
         return collect([
             'active' => 'Active',
+            'completed' => 'Completed',
             'failed' => 'Failed',
             'all' => 'All jobs',
         ]);

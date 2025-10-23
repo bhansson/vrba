@@ -72,9 +72,9 @@
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full border text-xs font-medium {{ $statusStyles[$job->status] ?? 'bg-gray-100 text-gray-800 border-gray-300' }}">
                             {{ Str::headline($job->status) }}
                         </span>
-                        @if ($job->status === \App\Models\ProductAiJob::STATUS_FAILED && $job->last_error)
+                        @if ($job->status === \App\Models\ProductAiJob::STATUS_FAILED && $job->friendlyErrorMessage())
                             <div class="mt-1 text-xs text-red-600">
-                                {{ Str::limit($job->last_error, 140) }}
+                                {{ $job->friendlyErrorMessage() }}
                             </div>
                         @endif
                     </div>
@@ -105,6 +105,8 @@
                         No active jobs right now. Trigger an AI request to see it appear here.
                     @elseif ($filter === 'failed')
                         No failed jobs found. If an AI run errors we'll display details here.
+                    @elseif ($filter === 'completed')
+                        No completed jobs yet. Run an AI generation to see results here.
                     @else
                         No AI jobs found yet.
                     @endif
