@@ -6,7 +6,7 @@
             <div>
                 <h1 class="text-2xl font-semibold text-gray-800">Products</h1>
                 <p class="mt-1 text-sm text-gray-600">
-                    Search your catalog by title, SKU, or GTIN.
+                    Search your catalog by title, brand, SKU, or GTIN.
                 </p>
             </div>
 
@@ -81,6 +81,7 @@
                                 {{ $product->title ?: 'Untitled product' }}
                             </div>
                             <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                                <span>Brand: {{ $product->brand ?: '—' }}</span>
                                 <span>SKU: {{ $product->sku ?: '—' }}</span>
                                 <span>GTIN: {{ $product->gtin ?: '—' }}</span>
                                 <span>Updated {{ $product->updated_at->diffForHumans() }}</span>

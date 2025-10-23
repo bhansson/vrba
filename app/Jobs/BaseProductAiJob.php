@@ -225,7 +225,6 @@ abstract class BaseProductAiJob implements ShouldQueue
             '{{ description_excerpt }}' => $descriptionExcerpt !== '' ? $descriptionExcerpt : 'N/A',
             '{{ sku }}' => $product->sku ?: 'N/A',
             '{{ gtin }}' => $product->gtin ?: 'N/A',
-            '{{ price }}' => $this->formatPrice($product->price),
             '{{ url }}' => $product->url ?: 'N/A',
         ];
 
@@ -305,14 +304,5 @@ abstract class BaseProductAiJob implements ShouldQueue
     protected function cleanSingleLine(string $value): string
     {
         return trim(preg_replace("/\s+/", ' ', strip_tags($value)));
-    }
-
-    protected function formatPrice($price): string
-    {
-        if ($price === null || $price === '') {
-            return 'N/A';
-        }
-
-        return is_numeric($price) ? number_format((float) $price, 2, '.', '') : (string) $price;
     }
 }

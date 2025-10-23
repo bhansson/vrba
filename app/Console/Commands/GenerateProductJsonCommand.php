@@ -124,7 +124,6 @@ class GenerateProductJsonCommand extends Command
             'title' => $product->title,
             'description' => $product->description,
             'url' => $product->url,
-            'price' => $product->price,
             'created_at' => optional($product->created_at)->toIso8601String(),
             'updated_at' => optional($product->updated_at)->toIso8601String(),
             'ai' => $aiPayload,

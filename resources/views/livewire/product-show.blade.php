@@ -8,6 +8,7 @@
                         {{ $product->title ?: 'Untitled product' }}
                     </h1>
                     <div class="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-gray-500">
+                        <span>Brand: {{ $product->brand ?: '—' }}</span>
                         <span>SKU: {{ $product->sku ?: '—' }}</span>
                         <span>GTIN: {{ $product->gtin ?: '—' }}</span>
                         <span>Updated {{ $product->updated_at->diffForHumans() }}</span>
@@ -18,12 +19,12 @@
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div class="text-sm text-gray-600 space-y-1">
                         <div>
-                            <span class="font-medium text-gray-700">Feed:</span>
-                            <span>{{ $product->feed?->name ?: '—' }}</span>
+                            <span class="font-medium text-gray-700">Brand:</span>
+                            <span>{{ $product->brand ?: '—' }}</span>
                         </div>
                         <div>
-                            <span class="font-medium text-gray-700">Price:</span>
-                            <span>{{ $product->price !== null && $product->price !== '' ? number_format((float) $product->price, 2) : '—' }}</span>
+                            <span class="font-medium text-gray-700">Feed:</span>
+                            <span>{{ $product->feed?->name ?: '—' }}</span>
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-3">
@@ -70,12 +71,12 @@
                                 <dd class="mt-1 text-sm text-gray-900">{{ $product->sku ?: '—' }}</dd>
                             </div>
                             <div>
-                                <dt class="text-xs uppercase tracking-wide text-gray-500">GTIN</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ $product->gtin ?: '—' }}</dd>
+                                <dt class="text-xs uppercase tracking-wide text-gray-500">Brand</dt>
+                                <dd class="mt-1 text-sm text-gray-900">{{ $product->brand ?: '—' }}</dd>
                             </div>
                             <div>
-                                <dt class="text-xs uppercase tracking-wide text-gray-500">Price</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ $product->price !== null && $product->price !== '' ? number_format((float) $product->price, 2) : '—' }}</dd>
+                                <dt class="text-xs uppercase tracking-wide text-gray-500">GTIN</dt>
+                                <dd class="mt-1 text-sm text-gray-900">{{ $product->gtin ?: '—' }}</dd>
                             </div>
                             <div>
                                 <dt class="text-xs uppercase tracking-wide text-gray-500">Product URL</dt>

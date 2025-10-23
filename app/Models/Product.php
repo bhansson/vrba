@@ -15,13 +15,9 @@ class Product extends Model
         'sku',
         'gtin',
         'title',
+        'brand',
         'description',
         'url',
-        'price',
-    ];
-
-    protected $casts = [
-        'price' => 'decimal:2',
     ];
 
     public function feed()

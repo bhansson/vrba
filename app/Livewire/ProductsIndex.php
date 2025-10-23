@@ -63,6 +63,7 @@ class ProductsIndex extends Component
                             $operator = $this->likeOperator();
 
                             $inner->where('title', $operator, $like)
+                                ->orWhere('brand', $operator, $like)
                                 ->orWhere('sku', $operator, $like)
                                 ->orWhere('gtin', $operator, $like);
                         });

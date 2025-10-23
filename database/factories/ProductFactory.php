@@ -37,9 +37,9 @@ class ProductFactory extends Factory
             'sku' => (string) fake()->unique()->numberBetween(1000, 999999),
             'gtin' => fake()->optional()->ean13(),
             'title' => fake()->sentence(4),
+            'brand' => fake()->optional()->company(),
             'description' => fake()->paragraph(),
             'url' => fake()->url(),
-            'price' => fake()->randomFloat(2, 1, 999),
         ];
     }
 }

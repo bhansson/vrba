@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Product;
 use App\Models\ProductFeed;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -33,9 +34,9 @@ class ManageProductFeeds extends Component
         'sku' => '',
         'gtin' => '',
         'title' => '',
+        'brand' => '',
         'description' => '',
         'url' => '',
-        'price' => '',
     ];
 
     public bool $showMapping = false;
@@ -112,9 +113,23 @@ class ManageProductFeeds extends Component
                 throw new \RuntimeException('Could not determine available fields in the feed.');
             }
 
-            $mapping = $feed->field_mappings ?? [];
+            $mapping = array_merge([
+                'sku' => '',
+                'gtin' => '',
+                'title' => '',
+                'brand' => '',
+                'description' => '',
+                'url' => '',
+            ], Arr::only($feed->field_mappings ?? [], [
+                'sku',
+                'gtin',
+                'title',
+                'brand',
+                'description',
+                'url',
+            ]));
 
-            foreach (['sku', 'title', 'url', 'price'] as $required) {
+            foreach (['sku', 'title', 'url'] as $required) {
                 if (empty($mapping[$required])) {
                     throw new \RuntimeException('Feed is missing a mapping for ' . $required . '.');
                 }
@@ -122,7 +137,14 @@ class ManageProductFeeds extends Component
 
             DB::transaction(function () use ($feed, $parsed, $mapping): void {
                 $feed->forceFill([
-                    'field_mappings' => $mapping,
+                    'field_mappings' => Arr::only($mapping, [
+                        'sku',
+                        'gtin',
+                        'title',
+                        'brand',
+                        'description',
+                        'url',
+                    ]),
                 ])->save();
 
                 $feed->products()->delete();
@@ -148,9 +170,9 @@ class ManageProductFeeds extends Component
                             'sku' => $sku,
                             'gtin' => $this->maybeValue($type, $namespaces, $item, 'gtin', $mapping),
                             'title' => $title,
+                            'brand' => $this->maybeValue($type, $namespaces, $item, 'brand', $mapping),
                             'description' => $this->maybeValue($type, $namespaces, $item, 'description', $mapping),
                             'url' => $link,
-                            'price' => $this->extractPrice($this->extractValue($type, $namespaces, $item, $mapping['price'] ?? '')),
                             'created_at' => now(),
                             'updated_at' => now(),
                         ];
@@ -257,7 +279,7 @@ class ManageProductFeeds extends Component
         }
 
         if (! $this->isRefreshing) {
-            foreach (['sku', 'title', 'url', 'price'] as $required) {
+            foreach (['sku', 'title', 'url'] as $required) {
                 if (empty($this->mapping[$required])) {
                     $this->errorMessage = 'Please select a field for '.$required.'.';
                     return;
@@ -307,9 +329,9 @@ class ManageProductFeeds extends Component
                             'sku' => $sku,
                             'gtin' => $this->maybeValue($parsed['type'], $parsed['namespaces'], $item, 'gtin'),
                             'title' => $title,
+                            'brand' => $this->maybeValue($parsed['type'], $parsed['namespaces'], $item, 'brand'),
                             'description' => $this->maybeValue($parsed['type'], $parsed['namespaces'], $item, 'description'),
                             'url' => $link,
-                            'price' => $this->extractPrice($this->extractValue($parsed['type'], $parsed['namespaces'], $item, $this->mapping['price'] ?? '')),
                             'created_at' => now(),
                             'updated_at' => now(),
                         ];
@@ -733,19 +755,6 @@ class ManageProductFeeds extends Component
         return $query->first() ?? new ProductFeed(['team_id' => $teamId]);
     }
 
-    protected function extractPrice(?string $input): ?float
-    {
-        if (! $input) {
-            return null;
-        }
-
-        if (preg_match('/([-+]?[0-9]*[.,]?[0-9]+)/', $input, $matches)) {
-            return (float) str_replace(',', '.', $matches[1]);
-        }
-
-        return null;
-    }
-
     protected function suggestMappings(array $fields): void
     {
         $fieldSet = collect($fields);
@@ -753,9 +762,9 @@ class ManageProductFeeds extends Component
         $this->mapping['sku'] = $this->pickField($fieldSet, ['g:id', 'id', 'item_group_id', 'sku']);
         $this->mapping['gtin'] = $this->pickField($fieldSet, ['g:gtin', 'gtin']);
         $this->mapping['title'] = $this->pickField($fieldSet, ['g:title', 'title', 'item_title']);
+        $this->mapping['brand'] = $this->pickField($fieldSet, ['g:brand', 'brand', 'g:manufacturer', 'manufacturer']);
         $this->mapping['description'] = $this->pickField($fieldSet, ['g:description', 'description']);
         $this->mapping['url'] = $this->pickField($fieldSet, ['g:link', 'link', 'url']);
-        $this->mapping['price'] = $this->pickField($fieldSet, ['g:price', 'price']);
     }
 
     protected function pickField(Collection $fields, array $options): string

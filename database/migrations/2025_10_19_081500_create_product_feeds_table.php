@@ -33,9 +33,9 @@ return new class extends Migration
             $table->string('sku', 191);
             $table->string('gtin', 191)->nullable();
             $table->string('title');
+            $table->string('brand');
             $table->text('description')->nullable();
             $table->string('url', 2048);
-            $table->decimal('price', 12, 2)->nullable();
             $table->timestamps();
 
             $table->unique(['team_id', 'sku', 'product_feed_id']);
