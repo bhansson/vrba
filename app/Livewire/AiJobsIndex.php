@@ -38,12 +38,14 @@ class AiJobsIndex extends Component
             ->with(['product:id,title,sku'])
             ->where('team_id', $team->id);
 
-        if ($this->filter === 'active') {
-            $jobsQuery->whereIn('status', [
+        match ($this->filter) {
+            'active' => $jobsQuery->whereIn('status', [
                 ProductAiJob::STATUS_QUEUED,
                 ProductAiJob::STATUS_PROCESSING,
-            ]);
-        }
+            ]),
+            'failed' => $jobsQuery->where('status', ProductAiJob::STATUS_FAILED),
+            default => null,
+        };
 
         $jobs = $jobsQuery
             ->orderByDesc('queued_at')
@@ -61,6 +63,7 @@ class AiJobsIndex extends Component
     {
         return collect([
             'active' => 'Active',
+            'failed' => 'Failed',
             'all' => 'All jobs',
         ]);
     }

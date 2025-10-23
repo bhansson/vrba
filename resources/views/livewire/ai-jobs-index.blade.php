@@ -27,7 +27,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-3">
             <div>
                 <label for="filter" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Scope</label>
-                <select wire:model="filter" id="filter" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                <select wire:model.live="filter" id="filter" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                     @foreach ($statusOptions as $value => $label)
                         <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach
@@ -35,7 +35,7 @@
             </div>
             <div>
                 <label for="perPage" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Per page</label>
-                <select wire:model.number="perPage" id="perPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                <select wire:model.live.number="perPage" id="perPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                     <option value="10">10</option>
                     <option value="15">15</option>
                     <option value="25">25</option>
@@ -103,6 +103,8 @@
                 <div class="p-6 text-sm text-gray-600">
                     @if ($filter === 'active')
                         No active jobs right now. Trigger an AI request to see it appear here.
+                    @elseif ($filter === 'failed')
+                        No failed jobs found. If an AI run errors we'll display details here.
                     @else
                         No AI jobs found yet.
                     @endif
