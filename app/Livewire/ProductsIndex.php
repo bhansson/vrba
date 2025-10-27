@@ -14,24 +14,25 @@ class ProductsIndex extends Component
 {
     use WithPagination;
 
-    public int $perPage = 15;
+    public int $perPage = 100;
     public string $search = '';
+    public string $brand = '';
     public array $summaries = [];
     public array $summaryErrors = [];
     public array $summaryStatuses = [];
     public array $loadingSummary = [];
 
     protected $queryString = [
-        'perPage' => ['except' => 15],
         'search' => ['except' => ''],
+        'brand' => ['except' => ''],
     ];
 
-    public function updatingPerPage(): void
+    public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function updatingSearch(): void
+    public function updatingBrand(): void
     {
         $this->resetPage();
     }
@@ -39,6 +40,15 @@ class ProductsIndex extends Component
     public function render()
     {
         $team = Auth::user()->currentTeam;
+
+        $brands = Product::query()
+            ->where('team_id', $team->id)
+            ->whereNotNull('brand')
+            ->where('brand', '!=', '')
+            ->select('brand')
+            ->distinct()
+            ->orderBy('brand')
+            ->pluck('brand');
 
         $tokens = Str::of($this->search)
             ->squish()
@@ -55,6 +65,9 @@ class ProductsIndex extends Component
                 'latestAiFaq',
             ])
             ->where('team_id', $team->id)
+            ->when($this->brand !== '', function ($query) {
+                $query->where('brand', $this->brand);
+            })
             ->when($tokens->isNotEmpty(), function ($query) use ($tokens) {
                 $query->where(function ($builder) use ($tokens) {
                     foreach ($tokens as $token) {
@@ -84,6 +97,7 @@ class ProductsIndex extends Component
 
         return view('livewire.products-index', [
             'products' => $products,
+            'brands' => $brands,
         ]);
     }
 

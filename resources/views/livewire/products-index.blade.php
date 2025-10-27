@@ -6,7 +6,7 @@
             <div>
                 <h1 class="text-2xl font-semibold text-gray-800">Products</h1>
                 <p class="mt-1 text-sm text-gray-600">
-                    Search your catalog by title, brand, SKU, or GTIN.
+                    Search your catalog by title, brand, SKU, or GTIN, or narrow by brand below.
                 </p>
             </div>
 
@@ -33,21 +33,25 @@
                     @endif
                 </div>
 
-                <div class="flex items-center space-x-2 text-sm text-gray-600 sm:justify-end">
-                    <span>Show</span>
-                    <select wire:model.number="perPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" aria-label="Results per page">
-                        <option value="10">10</option>
-                        <option value="15">15</option>
-                        <option value="25">25</option>
-                        <option value="50">50</option>
+                <div class="flex-1 sm:flex-none sm:w-56">
+                    <label for="brand-filter" class="sr-only">Filter by brand</label>
+                    <select
+                        id="brand-filter"
+                        wire:model.live="brand"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                        aria-label="Filter by brand"
+                    >
+                        <option value="">All brands</option>
+                        @foreach ($brands as $brandOption)
+                            <option value="{{ $brandOption }}">{{ $brandOption }}</option>
+                        @endforeach
                     </select>
-                    <span>per page</span>
                 </div>
             </div>
         </div>
 
         <div class="flex items-center justify-between mb-4 text-xs text-gray-500">
-            <div wire:loading.inline wire:target="search,page,perPage">
+            <div wire:loading.inline wire:target="search,page,brand">
                 Searching…
             </div>
             <div wire:loading.remove>
@@ -110,8 +114,8 @@
                     </div>
                 @empty
                     <div class="p-6 text-sm text-gray-600">
-                        @if (trim($search) !== '')
-                            No products match your search.
+                        @if (trim($search) !== '' || $brand !== '')
+                            No products match your current filters.
                         @else
                             No products imported yet.
                         @endif
