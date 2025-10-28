@@ -21,6 +21,9 @@
                     <x-nav-link href="{{ route('ai-jobs.index') }}" :active="request()->routeIs('ai-jobs.index')">
                         {{ __('AI Jobs') }}
                     </x-nav-link>
+                    <x-nav-link href="{{ route('ai-templates.index') }}" :active="request()->routeIs('ai-templates.index')">
+                        {{ __('AI Templates') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -153,6 +156,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link href="{{ route('ai-jobs.index') }}" :active="request()->routeIs('ai-jobs.index')">
                 {{ __('AI Jobs') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link href="{{ route('ai-templates.index') }}" :active="request()->routeIs('ai-templates.index')">
+                {{ __('AI Templates') }}
             </x-responsive-nav-link>
         </div>
 

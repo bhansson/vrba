@@ -3,9 +3,8 @@
 namespace Tests\Feature\Console;
 
 use App\Models\Product;
-use App\Models\ProductAiDescriptionSummary;
-use App\Models\ProductAiFaq;
-use App\Models\ProductAiUsp;
+use App\Models\ProductAiGeneration;
+use App\Models\ProductAiTemplate;
 use App\Models\Team;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -22,6 +21,8 @@ class GenerateProductJsonCommandTest extends TestCase
         $this->publicPath = base_path('storage/testing/public_'.Str::lower(Str::random(8)));
         File::ensureDirectoryExists($this->publicPath);
         $this->app->usePublicPath($this->publicPath);
+
+        ProductAiTemplate::syncDefaultTemplates();
     }
 
     protected function tearDown(): void
@@ -40,28 +41,42 @@ class GenerateProductJsonCommandTest extends TestCase
                 'sku' => 'SKU-123',
             ]);
 
-        $summary = ProductAiDescriptionSummary::factory()
-            ->for($team)
-            ->for($product)
-            ->create([
-                'sku' => $product->sku,
-                'content' => 'Generated summary content',
-            ]);
+        $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();
+        $descriptionTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION)->firstOrFail();
+        $uspTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_USPS)->firstOrFail();
+        $faqTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_FAQ)->firstOrFail();
 
-        ProductAiUsp::create([
+        $summary = ProductAiGeneration::create([
             'team_id' => $team->id,
             'product_id' => $product->id,
+            'product_ai_template_id' => $summaryTemplate->id,
+            'sku' => $product->sku,
+            'content' => 'Generated summary content',
+        ]);
+
+        ProductAiGeneration::create([
+            'team_id' => $team->id,
+            'product_id' => $product->id,
+            'product_ai_template_id' => $descriptionTemplate->id,
+            'sku' => $product->sku,
+            'content' => 'Generated description content',
+        ]);
+
+        ProductAiGeneration::create([
+            'team_id' => $team->id,
+            'product_id' => $product->id,
+            'product_ai_template_id' => $uspTemplate->id,
             'sku' => $product->sku,
             'content' => [
                 'Ships within 24 hours',
                 'Premium materials that last',
             ],
-            'meta' => null,
         ]);
 
-        ProductAiFaq::create([
+        ProductAiGeneration::create([
             'team_id' => $team->id,
             'product_id' => $product->id,
+            'product_ai_template_id' => $faqTemplate->id,
             'sku' => $product->sku,
             'content' => [
                 [
@@ -73,7 +88,6 @@ class GenerateProductJsonCommandTest extends TestCase
                     'answer' => 'We ship worldwide with tracked delivery.',
                 ],
             ],
-            'meta' => null,
         ]);
 
         $product->refresh();
@@ -120,13 +134,15 @@ class GenerateProductJsonCommandTest extends TestCase
                 'sku' => 'SKU-456',
             ]);
 
-        ProductAiDescriptionSummary::factory()
-            ->for($team)
-            ->for($product)
-            ->create([
-                'sku' => $product->sku,
-                'content' => 'Initial summary',
-            ]);
+        $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();
+
+        ProductAiGeneration::create([
+            'team_id' => $team->id,
+            'product_id' => $product->id,
+            'product_ai_template_id' => $summaryTemplate->id,
+            'sku' => $product->sku,
+            'content' => 'Initial summary',
+        ]);
 
         $this->artisan('products:generate-public-json')
             ->assertExitCode(0);
@@ -157,13 +173,15 @@ class GenerateProductJsonCommandTest extends TestCase
                 'sku' => 'SKU-789',
             ]);
 
-        ProductAiDescriptionSummary::factory()
-            ->for($team)
-            ->for($product)
-            ->create([
-                'sku' => $product->sku,
-                'content' => 'First summary',
-            ]);
+        $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();
+
+        ProductAiGeneration::create([
+            'team_id' => $team->id,
+            'product_id' => $product->id,
+            'product_ai_template_id' => $summaryTemplate->id,
+            'sku' => $product->sku,
+            'content' => 'First summary',
+        ]);
 
         $this->artisan('products:generate-public-json')
             ->assertExitCode(0);
@@ -179,13 +197,13 @@ class GenerateProductJsonCommandTest extends TestCase
 
         sleep(1);
 
-        ProductAiDescriptionSummary::factory()
-            ->for($team)
-            ->for($product)
-            ->create([
-                'sku' => $product->sku,
-                'content' => 'Updated summary text',
-            ]);
+        ProductAiGeneration::create([
+            'team_id' => $team->id,
+            'product_id' => $product->id,
+            'product_ai_template_id' => $summaryTemplate->id,
+            'sku' => $product->sku,
+            'content' => 'Updated summary text',
+        ]);
 
         $product->refresh();
 
@@ -213,13 +231,15 @@ class GenerateProductJsonCommandTest extends TestCase
                 'sku' => 'SKU-999',
             ]);
 
-        ProductAiDescriptionSummary::factory()
-            ->for($team)
-            ->for($product)
-            ->create([
-                'sku' => $product->sku,
-                'content' => 'Summary for missing hash team',
-            ]);
+        $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();
+
+        ProductAiGeneration::create([
+            'team_id' => $team->id,
+            'product_id' => $product->id,
+            'product_ai_template_id' => $summaryTemplate->id,
+            'sku' => $product->sku,
+            'content' => 'Summary for missing hash team',
+        ]);
 
         $this->artisan('products:generate-public-json')
             ->assertExitCode(0);

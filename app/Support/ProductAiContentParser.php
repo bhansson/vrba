@@ -7,14 +7,11 @@ use Illuminate\Support\Str;
 
 class ProductAiContentParser
 {
-    /**
-     * Normalize generated content for a given AI model.
-     */
-    public static function normalizeForModel(string $modelClass, mixed $content): mixed
+    public static function normalize(string $contentType, mixed $content): mixed
     {
-        return match ($modelClass) {
-            \App\Models\ProductAiUsp::class => self::parseUsps($content),
-            \App\Models\ProductAiFaq::class => self::parseFaq($content),
+        return match ($contentType) {
+            'usps' => self::parseUsps($content),
+            'faq' => self::parseFaq($content),
             default => is_string($content) ? trim($content) : $content,
         };
     }

@@ -2,10 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Jobs\RunProductAiTemplateJob;
 use App\Models\Product;
+use App\Models\ProductAiGeneration;
 use App\Models\ProductAiJob;
+use App\Models\ProductAiTemplate;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 class ProductShow extends Component
@@ -17,6 +20,8 @@ class ProductShow extends Component
     public array $generationLoading = [];
     public array $generationContent = [];
 
+    protected ?Collection $templateCache = null;
+
     public function mount(int $productId): void
     {
         $this->productId = $productId;
@@ -25,32 +30,31 @@ class ProductShow extends Component
     public function render()
     {
         $product = $this->product;
+        $templates = $this->templates();
+        $templatePayload = $this->buildTemplatePayload($product, $templates);
 
         return view('livewire.product-show', [
             'product' => $product,
+            'templates' => $templates,
+            'templatePayload' => $templatePayload,
             'generationStatus' => $this->generationStatus,
             'generationError' => $this->generationError,
             'generationLoading' => $this->generationLoading,
             'generationContent' => $this->generationContent,
-            'generationHistory' => $this->buildGenerationHistory($product),
         ]);
     }
 
-    public function queueGeneration(string $promptType): void
+    public function queueGeneration(int $templateId): void
     {
         $product = $this->product;
+        $template = $this->findTemplate($templateId);
+        $key = $template->slug;
 
-        $this->generationError[$promptType] = null;
-        $this->generationStatus[$promptType] = null;
-        $this->generationLoading[$promptType] = true;
+        $this->generationError[$key] = null;
+        $this->generationStatus[$key] = null;
+        $this->generationLoading[$key] = true;
 
         try {
-            $configuredGenerations = config('product-ai.generations', []);
-
-            if (! array_key_exists($promptType, $configuredGenerations)) {
-                throw new \RuntimeException('Unsupported generation type: '.$promptType);
-            }
-
             if (! config('services.openai.api_key')) {
                 throw new \RuntimeException('OpenAI API key is not configured.');
             }
@@ -65,99 +69,72 @@ class ProductShow extends Component
                 throw new \RuntimeException('User is missing an active team.');
             }
 
-            $generationConfig = $configuredGenerations[$promptType];
-
-            if (! is_array($generationConfig) || empty($generationConfig)) {
-                throw new \RuntimeException('Missing AI generation configuration for prompt type: '.$promptType);
-            }
-
-            $jobClass = data_get($generationConfig, 'job');
-
-            if (! is_string($jobClass) || ! class_exists($jobClass)) {
-                throw new \RuntimeException('Invalid job class for prompt type: '.$promptType);
-            }
-
             $jobRecord = ProductAiJob::create([
                 'team_id' => $team->id,
                 'product_id' => $product->id,
                 'sku' => $product->sku,
-                'prompt_type' => $promptType,
+                'product_ai_template_id' => $template->id,
                 'status' => ProductAiJob::STATUS_QUEUED,
                 'progress' => 0,
                 'queued_at' => now(),
             ]);
 
-            $jobClass::dispatch($jobRecord->id);
+            RunProductAiTemplateJob::dispatch($jobRecord->id);
 
-            if ($promptType === ProductAiJob::PROMPT_DESCRIPTION_SUMMARY) {
-                $this->generationContent[$promptType] = null;
+            if ($template->slug === ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY) {
+                $this->generationContent[$key] = null;
             }
 
-            $label = data_get($generationConfig, 'label', Str::headline($promptType));
-
-            $this->generationStatus[$promptType] = 'Queued '.$label.'. Track progress on the AI Jobs page.';
+            $this->generationStatus[$key] = 'Queued '.$template->name.'. Track progress on the AI Jobs page.';
         } catch (\Throwable $e) {
-            $this->generationError[$promptType] = $e->getMessage();
+            $this->generationError[$key] = $e->getMessage();
         } finally {
-            $this->generationLoading[$promptType] = false;
+            $this->generationLoading[$key] = false;
         }
     }
 
-    public function promoteGeneration(string $promptType, int $recordId): void
+    public function promoteGeneration(int $generationId): void
     {
-        $this->generationError[$promptType] = null;
-        $this->generationStatus[$promptType] = null;
-        $this->generationLoading[$promptType] = true;
+        $team = Auth::user()->currentTeam;
+        abort_if(! $team, 404);
+
+        /** @var ProductAiGeneration|null $generation */
+        $generation = ProductAiGeneration::query()
+            ->with('template')
+            ->where('id', $generationId)
+            ->where('product_id', $this->productId)
+            ->where('team_id', $team->id)
+            ->first();
+
+        if (! $generation || ! $generation->template) {
+            $templateSlug = 'unknown';
+            $this->generationError[$templateSlug] = 'Unable to find requested generation.';
+
+            return;
+        }
+
+        $key = $generation->template->slug;
+
+        $this->generationError[$key] = null;
+        $this->generationStatus[$key] = null;
+        $this->generationLoading[$key] = true;
 
         try {
-            $configuredGenerations = config('product-ai.generations', []);
-
-            if (! array_key_exists($promptType, $configuredGenerations)) {
-                throw new \RuntimeException('Unsupported generation type: '.$promptType);
-            }
-
-            $generationConfig = $configuredGenerations[$promptType];
-
-            $modelClass = data_get($generationConfig, 'model');
-
-            if (! is_string($modelClass) || ! class_exists($modelClass)) {
-                throw new \RuntimeException('Invalid model for prompt type: '.$promptType);
-            }
-
-            $team = Auth::user()->currentTeam;
-
-            if (! $team) {
-                throw new \RuntimeException('User is missing an active team.');
-            }
-
-            /** @var \Illuminate\Database\Eloquent\Model|null $record */
-            $record = $modelClass::query()
-                ->where('id', $recordId)
-                ->where('product_id', $this->productId)
-                ->where('team_id', $team->id)
-                ->first();
-
-            if (! $record) {
-                throw new \RuntimeException('Unable to find requested generation.');
-            }
-
-            $record->forceFill([
+            $generation->forceFill([
                 'updated_at' => now(),
             ])->save();
 
-            $label = data_get($generationConfig, 'label', Str::headline($promptType));
-
-            if ($promptType === ProductAiJob::PROMPT_DESCRIPTION_SUMMARY) {
-                $this->generationContent[$promptType] = $record->content;
+            if ($generation->template->slug === ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY) {
+                $this->generationContent[$key] = $generation->content;
             }
 
-            $this->generationStatus[$promptType] = 'Promoted '.$label.' to latest.';
+            $this->generationStatus[$key] = 'Promoted '.$generation->template->name.' to latest.';
 
             $this->dispatch('$refresh')->self();
         } catch (\Throwable $e) {
-            $this->generationError[$promptType] = $e->getMessage();
+            $this->generationError[$key] = $e->getMessage();
         } finally {
-            $this->generationLoading[$promptType] = false;
+            $this->generationLoading[$key] = false;
         }
     }
 
@@ -167,30 +144,64 @@ class ProductShow extends Component
 
         abort_if(! $team, 404);
 
+        $templates = $this->templates();
         $historyLimit = $this->historyLimit();
+        $templateIds = $templates->pluck('id');
+        $multiplier = max($templateIds->count(), 1);
 
         return Product::query()
             ->with([
                 'feed:id,name',
-                'latestAiDescriptionSummary',
-                'latestAiDescription',
-                'latestAiUsp',
-                'latestAiFaq',
-                'aiDescriptionSummaries' => static function ($query) use ($historyLimit) {
-                    $query->latest('updated_at')->limit($historyLimit);
-                },
-                'aiDescriptions' => static function ($query) use ($historyLimit) {
-                    $query->latest('updated_at')->limit($historyLimit);
-                },
-                'aiUsps' => static function ($query) use ($historyLimit) {
-                    $query->latest('updated_at')->limit($historyLimit);
-                },
-                'aiFaqs' => static function ($query) use ($historyLimit) {
-                    $query->latest('updated_at')->limit($historyLimit);
+                'aiGenerations' => static function ($query) use ($templateIds, $historyLimit, $multiplier) {
+                    $query->with('template')
+                        ->whereIn('product_ai_template_id', $templateIds)
+                        ->orderByDesc('updated_at')
+                        ->orderByDesc('id')
+                        ->limit($historyLimit * $multiplier * 2);
                 },
             ])
             ->where('team_id', $team->id)
             ->findOrFail($this->productId);
+    }
+
+    protected function templates(): Collection
+    {
+        if ($this->templateCache !== null) {
+            return $this->templateCache;
+        }
+
+        $team = Auth::user()->currentTeam;
+        abort_if(! $team, 404);
+
+        ProductAiTemplate::syncDefaultTemplates();
+
+        $this->templateCache = ProductAiTemplate::query()
+            ->forTeam($team->id)
+            ->active()
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get();
+
+        return $this->templateCache;
+    }
+
+    protected function findTemplate(int $templateId): ProductAiTemplate
+    {
+        $team = Auth::user()->currentTeam;
+        abort_if(! $team, 404);
+
+        ProductAiTemplate::syncDefaultTemplates();
+
+        $template = ProductAiTemplate::query()
+            ->forTeam($team->id)
+            ->active()
+            ->find($templateId);
+
+        if (! $template) {
+            throw new \RuntimeException('Unable to find requested template.');
+        }
+
+        return $template;
     }
 
     protected function historyLimit(): int
@@ -200,23 +211,71 @@ class ProductShow extends Component
         return $limit > 0 ? $limit : 10;
     }
 
-    protected function buildGenerationHistory(Product $product): array
+    /**
+     * @return array<int, array{
+     *     key: string,
+     *     template: ProductAiTemplate,
+     *     latest: ?ProductAiGeneration,
+     *     history: \Illuminate\Support\Collection<int, ProductAiGeneration>,
+     *     has_content: bool
+     * }>
+     */
+    protected function buildTemplatePayload(Product $product, Collection $templates): array
     {
-        $historyCollections = [
-            ProductAiJob::PROMPT_DESCRIPTION_SUMMARY => $product->aiDescriptionSummaries ?? collect(),
-            ProductAiJob::PROMPT_DESCRIPTION => $product->aiDescriptions ?? collect(),
-            ProductAiJob::PROMPT_USPS => $product->aiUsps ?? collect(),
-            ProductAiJob::PROMPT_FAQ => $product->aiFaqs ?? collect(),
-        ];
+        $grouped = $product->aiGenerations
+            ? $product->aiGenerations->groupBy('product_ai_template_id')
+            : collect();
 
-        $history = [];
+        $payload = [];
 
-        foreach ($historyCollections as $promptType => $collection) {
-            $sorted = collect($collection)->sortByDesc('updated_at')->values();
+        foreach ($templates as $template) {
+            $entries = $grouped->get($template->id, collect())
+                ->sortByDesc('updated_at')
+                ->values();
 
-            $history[$promptType] = $sorted->slice(1)->values();
+            /** @var ProductAiGeneration|null $latest */
+            $latest = $entries->first();
+            $historyLimit = max($template->historyLimit(), 1);
+            $history = $entries->slice(1)->take($historyLimit - 1)->values();
+
+            $key = $template->slug;
+
+            if ($latest) {
+                $this->generationContent[$key] = $latest->content;
+            }
+
+            $payload[] = [
+                'key' => $key,
+                'template' => $template,
+                'latest' => $latest,
+                'history' => $history,
+                'has_content' => $this->generationHasContent($latest),
+            ];
         }
 
-        return $history;
+        return $payload;
+    }
+
+    protected function generationHasContent(?ProductAiGeneration $generation): bool
+    {
+        if (! $generation) {
+            return false;
+        }
+
+        $content = $generation->content;
+
+        if (is_array($content)) {
+            return collect($content)
+                ->filter(function ($item) {
+                    if (is_array($item)) {
+                        return collect($item)->filter()->isNotEmpty();
+                    }
+
+                    return trim((string) $item) !== '';
+                })
+                ->isNotEmpty();
+        }
+
+        return trim((string) $content) !== '';
     }
 }

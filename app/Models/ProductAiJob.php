@@ -16,17 +16,11 @@ class ProductAiJob extends Model
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_FAILED = 'failed';
 
-    public const PROMPT_DESCRIPTION = 'description';
-    public const PROMPT_DESCRIPTION_SUMMARY = 'description_summary';
-    public const PROMPT_USPS = 'usps';
-    public const PROMPT_FAQ = 'faq';
-    public const PROMPT_REVIEW_SUMMARY = 'review_summary';
-
     protected $fillable = [
         'team_id',
         'product_id',
         'sku',
-        'prompt_type',
+        'product_ai_template_id',
         'status',
         'progress',
         'attempts',
@@ -52,6 +46,11 @@ class ProductAiJob extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(ProductAiTemplate::class, 'product_ai_template_id');
     }
 
     public function friendlyErrorMessage(): ?string

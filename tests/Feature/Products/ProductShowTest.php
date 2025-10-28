@@ -2,10 +2,11 @@
 
 namespace Tests\Feature\Products;
 
-use App\Jobs\BaseProductAiJob;
+use App\Jobs\RunProductAiTemplateJob;
 use App\Livewire\ProductShow;
 use App\Models\Product;
 use App\Models\ProductAiJob;
+use App\Models\ProductAiTemplate;
 use App\Models\ProductFeed;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,7 +39,7 @@ class ProductShowTest extends TestCase
         $this->get(route('products.show', $product))
             ->assertOk()
             ->assertSeeText('Example Product Title')
-            ->assertSeeText('Generate Summary');
+            ->assertSeeText('Description Summary');
     }
 
     public function test_product_details_page_returns_not_found_for_other_team(): void
@@ -62,7 +63,7 @@ class ProductShowTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_summarize_product_dispatches_jobs_from_details_page(): void
+    public function test_queue_generation_dispatches_job_from_details_page(): void
     {
         config()->set('services.openai.api_key', 'test-key');
 
@@ -83,32 +84,32 @@ class ProductShowTest extends TestCase
 
         $this->actingAs($user);
 
-        Livewire::test(ProductShow::class, ['productId' => $product->id])
-            ->call('summarizeProduct')
-            ->assertHasNoErrors();
+        ProductAiTemplate::syncDefaultTemplates();
 
-        $promptTypes = collect(config('product-ai.actions.generate_summary', []))
-            ->filter()
-            ->unique()
-            ->values();
+        $templates = ProductAiTemplate::query()
+            ->whereIn('slug', config('product-ai.actions.generate_summary', []))
+            ->get();
 
-        $promptTypes->each(function (string $promptType) use ($product): void {
+        $this->assertNotEmpty($templates);
+
+        $livewire = Livewire::test(ProductShow::class, ['productId' => $product->id]);
+
+        foreach ($templates as $template) {
+            $livewire->call('queueGeneration', $template->id)
+                ->assertHasNoErrors();
+
             $this->assertDatabaseHas('product_ai_jobs', [
                 'product_id' => $product->id,
-                'prompt_type' => $promptType,
+                'product_ai_template_id' => $template->id,
                 'status' => ProductAiJob::STATUS_QUEUED,
             ]);
 
-            $jobClass = data_get(config('product-ai.generations.'.$promptType, []), 'job');
-
-            $this->assertIsString($jobClass, 'Expected job class to be configured for '.$promptType);
-
-            Queue::assertPushed($jobClass, function (BaseProductAiJob $job) use ($product, $promptType): bool {
+            Queue::assertPushed(RunProductAiTemplateJob::class, function (RunProductAiTemplateJob $job) use ($product, $template): bool {
                 $jobRecord = ProductAiJob::find($job->productAiJobId);
 
                 return $jobRecord?->product_id === $product->id
-                    && $jobRecord->prompt_type === $promptType;
+                    && $jobRecord->product_ai_template_id === $template->id;
             });
-        });
+        }
     }
 }

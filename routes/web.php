@@ -32,4 +32,7 @@ Route::middleware([
 
     Route::view('/ai-jobs', 'ai-jobs.index')
         ->name('ai-jobs.index');
+
+    Route::view('/ai-templates', 'ai-templates.index')
+        ->name('ai-templates.index');
 });

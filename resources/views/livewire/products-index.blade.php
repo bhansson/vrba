@@ -69,15 +69,9 @@
 
                 @forelse ($products as $product)
                     @php
-                        $latestGeneration = collect([
-                            ['label' => 'Summary', 'timestamp' => optional($product->latestAiDescriptionSummary)->updated_at],
-                            ['label' => 'Description', 'timestamp' => optional($product->latestAiDescription)->updated_at],
-                            ['label' => 'USPs', 'timestamp' => optional($product->latestAiUsp)->updated_at],
-                            ['label' => 'FAQ', 'timestamp' => optional($product->latestAiFaq)->updated_at],
-                        ])
-                            ->filter(fn ($item) => $item['timestamp'])
-                            ->sortByDesc('timestamp')
-                            ->first();
+                        $latestGenerationRecord = $product->latestAiGeneration;
+                        $latestGenerationLabel = $latestGenerationRecord?->template?->name ?? 'AI Generation';
+                        $latestGenerationTimestamp = $latestGenerationRecord?->updated_at ?? $latestGenerationRecord?->created_at;
                     @endphp
                     <div wire:key="product-{{ $product->id }}" class="flex flex-col gap-4 px-4 py-5 transition-colors sm:grid sm:grid-cols-12 sm:items-center hover:bg-gray-50">
                         <div class="sm:col-span-8">
@@ -97,9 +91,9 @@
                             @endif
                         </div>
                         <div class="sm:col-span-2 text-sm text-gray-700">
-                            @if ($latestGeneration)
+                            @if ($latestGenerationRecord && $latestGenerationTimestamp)
                                 <p aria-live="polite">
-                                    {{ $latestGeneration['label'] }} generated {{ $latestGeneration['timestamp']->diffForHumans() }}
+                                    {{ $latestGenerationLabel }} generated {{ $latestGenerationTimestamp->diffForHumans() }}
                                 </p>
                             @else
                                 <p class="text-gray-500">Never generated</p>

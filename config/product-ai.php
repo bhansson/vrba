@@ -1,14 +1,6 @@
 <?php
 
-use App\Jobs\GenerateProductDescription;
-use App\Jobs\GenerateProductDescriptionSummary;
-use App\Jobs\GenerateProductFaq;
-use App\Jobs\GenerateProductUsps;
-use App\Models\ProductAiDescription;
-use App\Models\ProductAiDescriptionSummary;
-use App\Models\ProductAiFaq;
-use App\Models\ProductAiJob;
-use App\Models\ProductAiUsp;
+use App\Models\ProductAiTemplate;
 
 return [
     'defaults' => [
@@ -17,121 +9,167 @@ return [
         'description_excerpt_limit' => 600,
     ],
 
-    'actions' => [
-        'generate_summary' => [
-            ProductAiJob::PROMPT_DESCRIPTION_SUMMARY,
-            ProductAiJob::PROMPT_DESCRIPTION,
-            ProductAiJob::PROMPT_USPS,
-            ProductAiJob::PROMPT_FAQ,
+    /*
+    |--------------------------------------------------------------------------
+    | Available Context Variables
+    |--------------------------------------------------------------------------
+    |
+    | Each template can opt-in to the variables below. They are exposed to the
+    | UI as selectable tokens and resolved at runtime when the prompt is built.
+    |
+    */
+    'context_variables' => [
+        'title' => [
+            'label' => 'Product Title',
+            'attribute' => 'title',
+            'default' => 'Untitled product',
+            'clean' => 'single_line',
+        ],
+        'description' => [
+            'label' => 'Full Description',
+            'attribute' => 'description',
+            'default' => 'N/A',
+            'clean' => 'multiline',
+        ],
+        'sku' => [
+            'label' => 'SKU',
+            'attribute' => 'sku',
+            'default' => 'N/A',
+            'clean' => 'single_line',
+        ],
+        'gtin' => [
+            'label' => 'GTIN',
+            'attribute' => 'gtin',
+            'default' => 'N/A',
+            'clean' => 'single_line',
+        ],
+        'brand' => [
+            'label' => 'Brand',
+            'attribute' => 'brand',
+            'default' => 'N/A',
+            'clean' => 'single_line',
+        ],
+        'url' => [
+            'label' => 'Product URL',
+            'attribute' => 'url',
+            'default' => 'N/A',
+            'clean' => 'single_line',
         ],
     ],
 
-    'generations' => [
-        ProductAiJob::PROMPT_DESCRIPTION_SUMMARY => [
-            'label' => 'Description Summary',
-            'job' => GenerateProductDescriptionSummary::class,
-            'model' => ProductAiDescriptionSummary::class,
-            'meta_key' => 'description_summary_record_id',
-            'history_limit' => 10,
-            'prompts' => [
-                'system' => 'You are a product marketing assistant who writes short, high-converting product summaries.',
-                'user' => <<<'PROMPT'
+    /*
+    |--------------------------------------------------------------------------
+    | Default Templates
+    |--------------------------------------------------------------------------
+    |
+    | These ship with the application and are seeded during migration. Teams
+    | can create additional templates at runtime without modifying code.
+    |
+    */
+    'default_templates' => [
+        ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY => [
+            'name' => 'Description Summary',
+            'description' => 'Generates a concise, high-converting summary (up to 60 words) highlighting why the product matters.',
+            'system_prompt' => 'You are a product marketing assistant who writes short, high-converting product summaries. You MUST only respond with ONLY a valid plain text string. Keep formatting plain text.',
+            'prompt' => <<<'PROMPT'
 Create a concise, high-converting marketing summary (maximum 60 words) for the product below. Highlight what makes it stand out and keep the tone upbeat yet trustworthy.
 
 Title: {{ title }}
 GTIN: {{ gtin }}
-Product description: {{ description_excerpt }}
+Product description: {{ description }}
 PROMPT,
-                'description_excerpt_limit' => 400,
+            'context' => [
+                ['key' => 'title'],
+                ['key' => 'gtin'],
+                ['key' => 'description'],
             ],
-            'options' => [],
+            'settings' => [
+                'content_type' => 'text',
+                'options' => [],
+            ],
         ],
 
-        ProductAiJob::PROMPT_DESCRIPTION => [
-            'label' => 'Description',
-            'job' => GenerateProductDescription::class,
-            'model' => ProductAiDescription::class,
-            'meta_key' => 'description_record_id',
-            'history_limit' => 10,
-            'prompts' => [
-                'system' => 'You are an ecommerce conversion copywriter who crafts persuasive, human-sounding product descriptions.',
-                'user' => <<<'PROMPT'
-Write a compelling product description between 100 and 500 words based on the details below. Focus on benefits, address likely objections. Use short paragraphs and keep formatting plain text.
+        ProductAiTemplate::SLUG_DESCRIPTION => [
+            'name' => 'Product Description',
+            'description' => 'Produces a detailed, conversion-focused product description between 100 and 500 words.',
+            'system_prompt' => 'You are an ecommerce conversion copywriter who crafts persuasive, human-sounding product descriptions. You MUST only respond with ONLY a valid plain text string. Keep formatting plain text.',
+            'prompt' => <<<'PROMPT'
+Write a compelling product description between 100 and 500 words based on the details below. Focus on benefits and address likely objections.
 
 Title: {{ title }}
 GTIN: {{ gtin }}
-Product description: {{ description_excerpt }}
+Product description: {{ description }}
 PROMPT,
-                'description_excerpt_limit' => 1200,
+            'context' => [
+                ['key' => 'title'],
+                ['key' => 'gtin'],
+                ['key' => 'description'],
             ],
-            'options' => [],
+            'settings' => [
+                'content_type' => 'text',
+                'options' => [],
+            ],
         ],
 
-        ProductAiJob::PROMPT_USPS => [
-            'label' => 'Unique Selling Points',
-            'job' => GenerateProductUsps::class,
-            'model' => ProductAiUsp::class,
-            'meta_key' => 'usp_record_id',
-            'history_limit' => 10,
-            'prompts' => [
-                'system' => 'You are a conversion-focused marketer skilled at extracting concrete unique selling points from product data.',
-                'user' => <<<'PROMPT'
-List exactly four concise unique selling points for the product below. Each USP must be a single sentence fragment of fewer than 20 words. Avoid generic phrases like "high quality" or "great value" unless you have supporting detail. 
-Respond with ONLY a valid JSON document matching this structure exactly:
-
-[
-  "USP 1",
-  "USP 2",
-  "USP 3",
-  "USP 4"
-]
-
-Use double quotes for all strings, keep it on a single line if possible, and include nothing before or after the JSON.
+        ProductAiTemplate::SLUG_USPS => [
+            'name' => 'Unique Selling Points',
+            'description' => 'Summarises between 3 to 6 concrete unique selling points as a JSON array of short bullet-friendly statements.',
+            'system_prompt' => 'You are a conversion-focused marketer skilled at extracting concrete unique selling points from product data. You MUST only respond with ONLY a valid JSON array of strings.',
+            'prompt' => <<<'PROMPT'
+List a minimum of 3 and maximum 6 concise unique selling points for the product below. Each USP must be fewer than 20 words and avoid generic phrases.
 
 Title: {{ title }}
 GTIN: {{ gtin }}
-Product description: {{ description_excerpt }}
+Product description: {{ description }}
 PROMPT,
-                'description_excerpt_limit' => 800,
+            'context' => [
+                ['key' => 'title'],
+                ['key' => 'gtin'],
+                ['key' => 'description'],
             ],
-            'options' => [],
+            'settings' => [
+                'content_type' => 'usps',
+                'options' => [],
+            ],
         ],
 
-        ProductAiJob::PROMPT_FAQ => [
-            'label' => 'FAQ',
-            'job' => GenerateProductFaq::class,
-            'model' => ProductAiFaq::class,
-            'meta_key' => 'faq_record_id',
-            'history_limit' => 10,
-            'prompts' => [
-                'system' => 'You draft helpful pre-sale FAQ entries for ecommerce products.',
-                'user' => <<<'PROMPT'
-Create three customer-facing FAQ entries for the product below. For each entry, provide a concise question and a two-sentence answer. Address common concerns (fit, compatibility, materials, shipping, warranty, installation, etc.) when relevant. Respond with ONLY a valid JSON document matching this structure exactly:
-
-[
-  {
-    "question": "Question 1",
-    "answer": "Answer 1"
-  },
-  {
-    "question": "Question 2",
-    "answer": "Answer 2"
-  },
-  {
-    "question": "Question 3",
-    "answer": "Answer 3"
-  }
-]
-
-Use double quotes for all strings, keep keys in the order shown, and include nothing before or after the JSON.
+        ProductAiTemplate::SLUG_FAQ => [
+            'name' => 'FAQ',
+            'description' => 'Creates three pre-sale FAQ entries with customer-friendly questions and two-sentence answers in JSON format.',
+            'system_prompt' => 'You draft helpful pre-sale FAQ entries for ecommerce products. You MUST always respond with ONLY a valid JSON array containing objects with "question" and "answer" keys.',
+            'prompt' => <<<'PROMPT'
+Create exactly three customer-facing FAQ entries for the product below. For each entry provide a concise question and a two sentence answer.
 
 Title: {{ title }}
 GTIN: {{ gtin }}
-Product description: {{ description_excerpt }}
+Product description: {{ description }}
 PROMPT,
-                'description_excerpt_limit' => 1200,
+            'context' => [
+                ['key' => 'title'],
+                ['key' => 'gtin'],
+                ['key' => 'description'],
             ],
-            'options' => [],
+            'settings' => [
+                'content_type' => 'faq',
+                'options' => [],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Action Definitions
+    |--------------------------------------------------------------------------
+    |
+    | Named sets of templates the UI can surface together.
+    |
+    */
+    'actions' => [
+        'generate_summary' => [
+            ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY,
+            ProductAiTemplate::SLUG_DESCRIPTION,
+            ProductAiTemplate::SLUG_USPS,
+            ProductAiTemplate::SLUG_FAQ,
         ],
     ],
 ];

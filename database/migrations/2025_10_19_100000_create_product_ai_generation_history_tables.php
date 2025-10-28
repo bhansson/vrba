@@ -8,12 +8,30 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::create('product_ai_templates', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('team_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->string('slug', 100);
+            $table->string('name', 191);
+            $table->string('description', 255)->nullable();
+            $table->boolean('is_default')->default(false);
+            $table->boolean('is_active')->default(true);
+            $table->text('system_prompt')->nullable();
+            $table->longText('prompt');
+            $table->json('context')->nullable();
+            $table->json('settings')->nullable();
+            $table->timestamps();
+
+            $table->unique(['team_id', 'slug']);
+            $table->index(['is_active', 'team_id']);
+        });
+
         Schema::create('product_ai_jobs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_ai_template_id')->constrained('product_ai_templates')->cascadeOnDelete();
             $table->string('sku', 191)->index();
-            $table->string('prompt_type', 64);
             $table->string('status', 32)->default('queued');
             $table->unsignedTinyInteger('progress')->default(0);
             $table->unsignedTinyInteger('attempts')->default(0);
@@ -24,78 +42,31 @@ return new class extends Migration
             $table->json('meta')->nullable();
             $table->timestamps();
 
-            $table->index(['team_id', 'prompt_type', 'status']);
+            $table->index(['team_id', 'product_ai_template_id', 'status']);
             $table->index(['status', 'queued_at']);
         });
 
-        Schema::create('product_ai_descriptions', function (Blueprint $table) {
+        Schema::create('product_ai_generations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_ai_template_id')->constrained('product_ai_templates')->cascadeOnDelete();
+            $table->foreignId('product_ai_job_id')->nullable()->constrained('product_ai_jobs')->nullOnDelete();
             $table->string('sku', 191);
-            $table->text('content');
+            $table->json('content')->nullable();
             $table->json('meta')->nullable();
             $table->timestamps();
 
-            $table->index(['product_id', 'created_at']);
+            $table->index(['product_id', 'product_ai_template_id', 'created_at']);
+            $table->index(['team_id', 'product_ai_template_id']);
         });
 
-        Schema::create('product_ai_description_summaries', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('team_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->string('sku', 191);
-            $table->text('content');
-            $table->json('meta')->nullable();
-            $table->timestamps();
-
-            $table->index(['product_id', 'created_at']);
-        });
-
-        Schema::create('product_ai_usps', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('team_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->string('sku', 191);
-            $table->json('content');
-            $table->json('meta')->nullable();
-            $table->timestamps();
-
-            $table->index(['product_id', 'created_at']);
-        });
-
-        Schema::create('product_ai_faqs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('team_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->string('sku', 191);
-            $table->json('content');
-            $table->json('meta')->nullable();
-            $table->timestamps();
-
-            $table->index(['product_id', 'created_at']);
-        });
-
-        Schema::create('product_ai_review_summaries', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('team_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->string('sku', 191);
-            $table->text('content');
-            $table->json('meta')->nullable();
-            $table->timestamps();
-
-            $table->index(['product_id', 'created_at']);
-        });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('product_ai_review_summaries');
-        Schema::dropIfExists('product_ai_faqs');
-        Schema::dropIfExists('product_ai_usps');
-        Schema::dropIfExists('product_ai_description_summaries');
-        Schema::dropIfExists('product_ai_descriptions');
+        Schema::dropIfExists('product_ai_generations');
         Schema::dropIfExists('product_ai_jobs');
+        Schema::dropIfExists('product_ai_templates');
     }
 };

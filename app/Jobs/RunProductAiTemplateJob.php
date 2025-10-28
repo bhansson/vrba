@@ -3,12 +3,14 @@
 namespace App\Jobs;
 
 use App\Models\Product;
+use App\Models\ProductAiGeneration;
 use App\Models\ProductAiJob;
+use App\Models\ProductAiTemplate;
 use App\Support\ProductAiContentParser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
@@ -18,7 +20,7 @@ use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
-abstract class BaseProductAiJob implements ShouldQueue
+class RunProductAiTemplateJob implements ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -40,11 +42,17 @@ abstract class BaseProductAiJob implements ShouldQueue
         $this->onQueue('ai');
     }
 
-    abstract protected function promptType(): string;
-
     public function handle(): void
     {
-        $jobRecord = ProductAiJob::query()->findOrFail($this->productAiJobId);
+        $jobRecord = ProductAiJob::query()
+            ->with('template')
+            ->findOrFail($this->productAiJobId);
+
+        $template = $jobRecord->template;
+
+        if (! $template || ! $template->is_active) {
+            throw new RuntimeException('The selected AI template is no longer available.');
+        }
 
         $jobRecord->forceFill([
             'status' => ProductAiJob::STATUS_PROCESSING,
@@ -53,13 +61,6 @@ abstract class BaseProductAiJob implements ShouldQueue
             'progress' => 10,
             'last_error' => null,
         ])->save();
-
-        $config = $this->promptConfig();
-        $modelClass = Arr::get($config, 'model');
-
-        if (! $modelClass) {
-            throw new RuntimeException('Product AI generation is missing a target model.');
-        }
 
         $product = Product::query()
             ->with('team')
@@ -73,13 +74,13 @@ abstract class BaseProductAiJob implements ShouldQueue
         }
 
         try {
-            $messages = $this->buildMessages($config, $product);
-            $options = $this->mergeOptions($config);
+            $messages = $this->buildMessages($template, $product);
+            $options = $template->options();
             $timeout = (int) ($options['timeout'] ?? 30);
             unset($options['timeout']);
 
             $payload = array_merge([
-                'model' => Arr::get($config, 'model_override', config('services.openai.model', 'gpt-5')),
+                'model' => Arr::get($template->settings, 'model', config('services.openai.model', 'gpt-5')),
                 'messages' => $messages,
             ], $options);
 
@@ -101,7 +102,8 @@ abstract class BaseProductAiJob implements ShouldQueue
                 Log::warning('OpenAI request failed', [
                     'product_ai_job_id' => $jobRecord->id,
                     'product_id' => $product->id,
-                    'prompt_type' => $jobRecord->prompt_type,
+                    'template_id' => $template->id,
+                    'template_slug' => $template->slug,
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
@@ -116,7 +118,8 @@ abstract class BaseProductAiJob implements ShouldQueue
                 Log::warning('OpenAI response missing content', [
                     'product_ai_job_id' => $jobRecord->id,
                     'product_id' => $product->id,
-                    'prompt_type' => $jobRecord->prompt_type,
+                    'template_id' => $template->id,
+                    'template_slug' => $template->slug,
                     'response' => $data,
                 ]);
 
@@ -127,28 +130,26 @@ abstract class BaseProductAiJob implements ShouldQueue
                 'progress' => 80,
             ])->save();
 
-            /** @var class-string<\Illuminate\Database\Eloquent\Model> $modelClass */
-            $contentPayload = ProductAiContentParser::normalizeForModel($modelClass, $content);
+            $contentPayload = ProductAiContentParser::normalize($template->contentType(), $content);
 
-            $record = $modelClass::create([
+            $record = ProductAiGeneration::create([
                 'team_id' => $product->team_id,
                 'product_id' => $product->id,
+                'product_ai_template_id' => $template->id,
+                'product_ai_job_id' => $jobRecord->id,
                 'sku' => $product->sku,
                 'content' => $contentPayload,
                 'meta' => [
                     'model' => $payload['model'],
+                    'template_slug' => $template->slug,
                     'job_id' => $jobRecord->id,
-                    'prompt_type' => $jobRecord->prompt_type,
                 ],
             ]);
 
-            $this->trimHistory($modelClass, $product->id, (int) Arr::get($config, 'history_limit', $this->defaultHistoryLimit()));
+            $this->trimHistory($template, $product->id, max($template->historyLimit(), 1));
 
             $meta = $jobRecord->meta ?? [];
-
-            if ($metaKey = Arr::get($config, 'meta_key')) {
-                $meta[$metaKey] = $record->id;
-            }
+            $meta['generation_id'] = $record->id;
 
             $jobRecord->forceFill([
                 'status' => ProductAiJob::STATUS_COMPLETED,
@@ -184,58 +185,24 @@ abstract class BaseProductAiJob implements ShouldQueue
         ])->save();
     }
 
-    protected function promptConfig(): array
+    protected function buildMessages(ProductAiTemplate $template, Product $product): array
     {
-        $config = config('product-ai.generations.'.$this->promptType());
+        $userTemplate = trim((string) $template->prompt);
 
-        if (! is_array($config) || empty($config)) {
-            throw new RuntimeException(sprintf('Prompt configuration missing for [%s].', $this->promptType()));
+        if ($userTemplate === '') {
+            throw new RuntimeException('Template prompt is empty.');
         }
 
-        return $config;
-    }
-
-    /**
-     * @param  array<string, mixed>  $config
-     */
-    protected function buildMessages(array $config, Product $product): array
-    {
-        $prompts = Arr::get($config, 'prompts', []);
-        $userTemplate = Arr::get($prompts, 'user');
-
-        if (! is_string($userTemplate) || trim($userTemplate) === '') {
-            throw new RuntimeException('User prompt template is not configured.');
-        }
-
-        $systemPrompt = Arr::get($prompts, 'system');
-        $descriptionLimit = (int) Arr::get(
-            $prompts,
-            'description_excerpt_limit',
-            $this->defaultDescriptionLimit()
-        );
-
-        $description = $this->cleanMultiline((string) ($product->description ?? ''));
-        $descriptionExcerpt = $descriptionLimit > 0
-            ? Str::limit($description, $descriptionLimit)
-            : $description;
-
-        $placeholders = [
-            '{{ title }}' => $product->title ? $this->cleanSingleLine($product->title) : 'Untitled product',
-            '{{ description }}' => $description !== '' ? $description : 'N/A',
-            '{{ description_excerpt }}' => $descriptionExcerpt !== '' ? $descriptionExcerpt : 'N/A',
-            '{{ sku }}' => $product->sku ?: 'N/A',
-            '{{ gtin }}' => $product->gtin ?: 'N/A',
-            '{{ url }}' => $product->url ?: 'N/A',
-        ];
-
+        $placeholders = $this->buildPlaceholders($template, $product);
         $userPrompt = strtr($userTemplate, $placeholders);
+        $systemPrompt = trim((string) $template->system_prompt);
 
         $messages = [];
 
-        if (is_string($systemPrompt) && trim($systemPrompt) !== '') {
+        if ($systemPrompt !== '') {
             $messages[] = [
                 'role' => 'system',
-                'content' => trim($systemPrompt),
+                'content' => strtr($systemPrompt, $placeholders),
             ];
         }
 
@@ -247,28 +214,109 @@ abstract class BaseProductAiJob implements ShouldQueue
         return $messages;
     }
 
-    /**
-     * @param  array<string, mixed>  $config
-     * @return array<string, mixed>
-     */
-    protected function mergeOptions(array $config): array
+    protected function buildPlaceholders(ProductAiTemplate $template, Product $product): array
     {
-        $defaultOptions = config('product-ai.defaults.options', []);
-        $customOptions = Arr::get($config, 'options', []);
+        $placeholders = [];
+        $context = $template->context ?? [];
 
-        return array_filter(
-            array_merge($defaultOptions, $customOptions),
-            static fn ($value) => $value !== null
-        );
+        foreach ($context as $definition) {
+            if (! is_array($definition)) {
+                continue;
+            }
+
+            $key = (string) ($definition['key'] ?? '');
+
+            if ($key === '') {
+                continue;
+            }
+
+            $placeholders['{{ '.$key.' }}'] = $this->resolveContextValue($key, $definition, $template, $product);
+        }
+
+        $pattern = '/{{\s*(.+?)\s*}}/u';
+        $templates = array_filter([
+            $template->prompt,
+            $template->system_prompt,
+        ]);
+
+        foreach ($templates as $templateString) {
+            if (! is_string($templateString)) {
+                continue;
+            }
+
+            if (preg_match_all($pattern, $templateString, $matches) === false) {
+                continue;
+            }
+
+            foreach ($matches[1] as $rawKey) {
+                $key = trim((string) $rawKey);
+
+                if ($key === '') {
+                    continue;
+                }
+
+                $placeholder = '{{ '.$key.' }}';
+
+                if (array_key_exists($placeholder, $placeholders)) {
+                    continue;
+                }
+
+                $placeholders[$placeholder] = $this->resolveContextValue($key, [], $template, $product);
+            }
+        }
+
+        return $placeholders;
     }
 
     /**
-     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $modelClass
+     * @param  array<string, mixed>  $definition
      */
-    protected function trimHistory(string $modelClass, int $productId, int $keep): void
+    protected function resolveContextValue(string $key, array $definition, ProductAiTemplate $template, Product $product): string
     {
-        $idsToRemove = $modelClass::query()
+        $variables = config('product-ai.context_variables', []);
+        $variable = $variables[$key] ?? null;
+        $attribute = $variable['attribute'] ?? $key;
+        $default = $definition['default'] ?? ($variable['default'] ?? 'N/A');
+
+        $rawValue = data_get($product, $attribute);
+
+        if (is_string($rawValue)) {
+            $rawValue = trim($rawValue);
+        }
+
+        if ($rawValue === null || $rawValue === '') {
+            $rawValue = $default;
+        }
+
+        $cleanMode = $definition['clean'] ?? ($variable['clean'] ?? 'single_line');
+
+        if ($cleanMode === 'multiline') {
+            $value = $this->cleanMultiline((string) $rawValue);
+        } else {
+            $value = $this->cleanSingleLine((string) $rawValue);
+        }
+
+        $shouldExcerpt = (bool) ($definition['excerpt'] ?? $variable['excerpt'] ?? false);
+        $limit = (int) ($definition['limit'] ?? $variable['limit'] ?? config('product-ai.defaults.description_excerpt_limit', 600));
+
+        if ($shouldExcerpt && $limit > 0 && $rawValue !== $default) {
+            $value = Str::limit($value, $limit);
+        }
+
+        if ($value === '') {
+            return (string) $default;
+        }
+
+        return $value;
+    }
+
+    protected function trimHistory(ProductAiTemplate $template, int $productId, int $keep): void
+    {
+        $keep = $keep > 0 ? $keep : 1;
+
+        $idsToRemove = ProductAiGeneration::query()
             ->where('product_id', $productId)
+            ->where('product_ai_template_id', $template->id)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->skip($keep)
@@ -278,19 +326,9 @@ abstract class BaseProductAiJob implements ShouldQueue
             return;
         }
 
-        $modelClass::query()
+        ProductAiGeneration::query()
             ->whereIn('id', $idsToRemove)
             ->delete();
-    }
-
-    protected function defaultHistoryLimit(): int
-    {
-        return (int) config('product-ai.defaults.history_limit', 10);
-    }
-
-    protected function defaultDescriptionLimit(): int
-    {
-        return (int) config('product-ai.defaults.description_excerpt_limit', 600);
     }
 
     protected function cleanMultiline(string $value): string

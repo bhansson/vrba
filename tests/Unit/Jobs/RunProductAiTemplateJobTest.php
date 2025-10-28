@@ -2,23 +2,26 @@
 
 namespace Tests\Unit\Jobs;
 
-use App\Jobs\GenerateProductDescriptionSummary;
+use App\Jobs\RunProductAiTemplateJob;
 use App\Models\Product;
-use App\Models\ProductAiDescriptionSummary;
 use App\Models\ProductAiJob;
+use App\Models\ProductAiGeneration;
+use App\Models\ProductAiTemplate;
 use App\Models\ProductFeed;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-class GenerateProductDescriptionSummaryTest extends TestCase
+class RunProductAiTemplateJobTest extends TestCase
 {
     use RefreshDatabase;
 
     public function test_job_creates_summary_record_and_trims_history(): void
     {
         config()->set('services.openai.api_key', 'test-key');
+
+        ProductAiTemplate::syncDefaultTemplates();
 
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -36,15 +39,21 @@ class GenerateProductDescriptionSummaryTest extends TestCase
             ]);
 
         // Seed 10 existing summaries to ensure the history trimming logic executes.
+        $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();
+
         foreach (range(1, 10) as $offset) {
-            ProductAiDescriptionSummary::factory()->create([
+            $generation = ProductAiGeneration::create([
                 'team_id' => $team->id,
                 'product_id' => $product->id,
+                'product_ai_template_id' => $summaryTemplate->id,
                 'sku' => $product->sku,
                 'content' => 'Legacy summary #'.$offset,
+            ]);
+
+            $generation->forceFill([
                 'created_at' => now()->subMinutes(60 + $offset),
                 'updated_at' => now()->subMinutes(60 + $offset),
-            ]);
+            ])->save();
         }
 
         Http::fake([
@@ -59,26 +68,30 @@ class GenerateProductDescriptionSummaryTest extends TestCase
             'team_id' => $team->id,
             'product_id' => $product->id,
             'sku' => $product->sku,
-            'prompt_type' => ProductAiJob::PROMPT_DESCRIPTION_SUMMARY,
+            'product_ai_template_id' => $summaryTemplate->id,
             'status' => ProductAiJob::STATUS_QUEUED,
             'progress' => 0,
             'queued_at' => now(),
         ]);
 
-        $job = new GenerateProductDescriptionSummary($jobRecord->id);
+        $job = new RunProductAiTemplateJob($jobRecord->id);
         $job->handle();
 
-        $this->assertDatabaseHas('product_ai_description_summaries', [
+        $this->assertDatabaseHas('product_ai_generations', [
             'product_id' => $product->id,
+            'product_ai_template_id' => $summaryTemplate->id,
             'content' => 'Newly generated summary.',
         ]);
 
-        $this->assertSame(10, ProductAiDescriptionSummary::where('product_id', $product->id)->count());
+        $this->assertSame(10, ProductAiGeneration::where('product_id', $product->id)
+            ->where('product_ai_template_id', $summaryTemplate->id)
+            ->count());
 
         $jobRecord->refresh();
 
         $this->assertSame(ProductAiJob::STATUS_COMPLETED, $jobRecord->status);
         $this->assertSame(100, $jobRecord->progress);
         $this->assertNotNull($jobRecord->finished_at);
+        $this->assertNotEmpty(data_get($jobRecord->meta, 'generation_id'));
     }
 }

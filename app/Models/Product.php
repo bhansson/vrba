@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Product extends Model
 {
@@ -30,48 +32,71 @@ class Product extends Model
         return $this->belongsTo(Team::class);
     }
 
-    public function aiDescriptionSummaries()
+    public function aiGenerations(): HasMany
     {
-        return $this->hasMany(ProductAiDescriptionSummary::class)->latest();
+        return $this->hasMany(ProductAiGeneration::class);
     }
 
-    public function aiDescriptions()
+    public function latestAiGeneration(): HasOne
     {
-        return $this->hasMany(ProductAiDescription::class);
+        return $this->hasOne(ProductAiGeneration::class)->latestOfMany('updated_at');
     }
 
-    public function latestAiDescriptionSummary()
+    public function aiDescriptionSummaries(): HasMany
     {
-        return $this->hasOne(ProductAiDescriptionSummary::class)->latestOfMany('updated_at');
+        return $this->aiGenerationsForTemplate(ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY);
     }
 
-    public function latestAiDescription()
+    public function aiDescriptions(): HasMany
     {
-        return $this->hasOne(ProductAiDescription::class)->latestOfMany('updated_at');
+        return $this->aiGenerationsForTemplate(ProductAiTemplate::SLUG_DESCRIPTION);
     }
 
-    public function aiUsps()
+    public function aiUsps(): HasMany
     {
-        return $this->hasMany(ProductAiUsp::class);
+        return $this->aiGenerationsForTemplate(ProductAiTemplate::SLUG_USPS);
     }
 
-    public function latestAiUsp()
+    public function aiFaqs(): HasMany
     {
-        return $this->hasOne(ProductAiUsp::class)->latestOfMany('updated_at');
+        return $this->aiGenerationsForTemplate(ProductAiTemplate::SLUG_FAQ);
     }
 
-    public function aiFaqs()
+    public function latestAiDescriptionSummary(): HasOne
     {
-        return $this->hasMany(ProductAiFaq::class);
+        return $this->latestAiGenerationForTemplate(ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY);
     }
 
-    public function latestAiFaq()
+    public function latestAiDescription(): HasOne
     {
-        return $this->hasOne(ProductAiFaq::class)->latestOfMany('updated_at');
+        return $this->latestAiGenerationForTemplate(ProductAiTemplate::SLUG_DESCRIPTION);
     }
 
-    public function latestAiReviewSummary()
+    public function latestAiUsp(): HasOne
     {
-        return $this->hasOne(ProductAiReviewSummary::class)->latestOfMany('updated_at');
+        return $this->latestAiGenerationForTemplate(ProductAiTemplate::SLUG_USPS);
+    }
+
+    public function latestAiFaq(): HasOne
+    {
+        return $this->latestAiGenerationForTemplate(ProductAiTemplate::SLUG_FAQ);
+    }
+
+    public function latestAiGenerationForTemplate(string $slug): HasOne
+    {
+        return $this->hasOne(ProductAiGeneration::class)
+            ->whereHas('template', static function ($query) use ($slug): void {
+                $query->where('slug', $slug);
+            })
+            ->latestOfMany('updated_at');
+    }
+
+    public function aiGenerationsForTemplate(string $slug): HasMany
+    {
+        return $this->hasMany(ProductAiGeneration::class)
+            ->whereHas('template', static function ($query) use ($slug): void {
+                $query->where('slug', $slug);
+            })
+            ->latest();
     }
 }

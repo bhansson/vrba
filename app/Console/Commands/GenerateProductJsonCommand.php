@@ -3,11 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Models\Product;
-use App\Models\ProductAiJob;
+use App\Models\ProductAiTemplate;
 use App\Models\Team;
 use App\Support\ProductAiContentParser;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use JsonException;
@@ -18,26 +19,11 @@ class GenerateProductJsonCommand extends Command
 
     protected $description = 'Generate public JSON exports for products with their latest AI generations.';
 
-    /**
-     * Map of AI prompt types to their corresponding latest relation on Product.
-     *
-     * @var array<string, string>
-     */
-    protected array $aiRelationMap = [
-        ProductAiJob::PROMPT_DESCRIPTION_SUMMARY => 'latestAiDescriptionSummary',
-        ProductAiJob::PROMPT_DESCRIPTION => 'latestAiDescription',
-        ProductAiJob::PROMPT_USPS => 'latestAiUsp',
-        ProductAiJob::PROMPT_FAQ => 'latestAiFaq',
-        ProductAiJob::PROMPT_REVIEW_SUMMARY => 'latestAiReviewSummary',
-    ];
-
     public function handle(): int
     {
         $force = (bool) $this->option('force');
         $written = 0;
         $skipped = 0;
-
-        $relations = array_values(array_filter(array_unique($this->aiRelationMap)));
 
         $teams = Team::query()
             ->orderBy('id')
@@ -55,12 +41,31 @@ class GenerateProductJsonCommand extends Command
             $directory = $this->teamDirectory($team);
             File::ensureDirectoryExists($directory);
 
+            ProductAiTemplate::syncDefaultTemplates();
+
+            $templates = $this->templatesForTeam($team);
+
+            if ($templates->isEmpty()) {
+                $this->comment(sprintf('Skipping team %d (%s): no AI templates available for export.', $team->id, $team->name));
+
+                continue;
+            }
+
+            $templateIds = $templates->pluck('id');
+
             Product::query()
                 ->where('team_id', $team->id)
                 ->whereNotNull('sku')
-                ->with($relations)
+                ->with([
+                    'aiGenerations' => static function ($query) use ($templateIds) {
+                        $query->with('template')
+                            ->whereIn('product_ai_template_id', $templateIds)
+                            ->orderByDesc('updated_at')
+                            ->orderByDesc('id');
+                    },
+                ])
                 ->orderBy('id')
-                ->chunkById(100, function ($products) use ($team, $directory, $force, &$written, &$skipped): void {
+                ->chunkById(100, function ($products) use ($team, $directory, $force, $templates, &$written, &$skipped): void {
                     foreach ($products as $product) {
                         $filePath = $this->productFilePath($directory, $product->sku);
 
@@ -70,7 +75,7 @@ class GenerateProductJsonCommand extends Command
                             continue;
                         }
 
-                        $payload = $this->buildPayload($product, $team);
+                        $payload = $this->buildPayload($product, $team, $templates);
 
                         try {
                             $json = json_encode(
@@ -95,24 +100,49 @@ class GenerateProductJsonCommand extends Command
         return Command::SUCCESS;
     }
 
-    protected function buildPayload(Product $product, Team $team): array
+    protected function templateSlugs(): array
+    {
+        return [
+            ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY,
+            ProductAiTemplate::SLUG_DESCRIPTION,
+            ProductAiTemplate::SLUG_USPS,
+            ProductAiTemplate::SLUG_FAQ,
+        ];
+    }
+
+    protected function templatesForTeam(Team $team): Collection
+    {
+        $slugs = $this->templateSlugs();
+
+        $templates = ProductAiTemplate::query()
+            ->forTeam($team->id)
+            ->active()
+            ->whereIn('slug', $slugs)
+            ->get()
+            ->keyBy('slug');
+
+        return collect($slugs)
+            ->map(static fn (string $slug) => $templates->get($slug))
+            ->filter();
+    }
+
+    protected function buildPayload(Product $product, Team $team, Collection $templates): array
     {
         $aiPayload = [];
 
-        foreach ($this->aiRelationMap as $promptType => $relation) {
-            if (! $relation) {
+        foreach ($templates as $template) {
+            $generation = $product->aiGenerations
+                ->where('product_ai_template_id', $template->id)
+                ->sortByDesc(fn ($record) => (($record->updated_at?->timestamp ?? 0) * 1000000) + $record->id)
+                ->first();
+
+            if (! $generation) {
                 continue;
             }
 
-            $record = $product->{$relation};
-
-            if (! $record) {
-                continue;
-            }
-
-            $aiPayload[$promptType] = [
-                'content' => $this->normalizePayloadContent($promptType, $record->content),
-                'updated_at' => optional($record->updated_at)->toIso8601String(),
+            $aiPayload[$template->slug] = [
+                'content' => $this->normalizePayloadContent($template, $generation->content),
+                'updated_at' => optional($generation->updated_at)->toIso8601String(),
             ];
         }
 
@@ -176,17 +206,13 @@ class GenerateProductJsonCommand extends Command
         return public_path('edge'.DIRECTORY_SEPARATOR.$team->public_hash);
     }
 
-    protected function normalizePayloadContent(string $promptType, mixed $content): mixed
+    protected function normalizePayloadContent(ProductAiTemplate $template, mixed $content): mixed
     {
-        if ($promptType === ProductAiJob::PROMPT_USPS) {
-            return ProductAiContentParser::parseUsps($content);
-        }
-
-        if ($promptType === ProductAiJob::PROMPT_FAQ) {
-            return ProductAiContentParser::parseFaq($content);
-        }
-
-        return is_string($content) ? trim($content) : $content;
+        return match ($template->contentType()) {
+            'usps' => ProductAiContentParser::parseUsps($content),
+            'faq' => ProductAiContentParser::parseFaq($content),
+            default => is_string($content) ? trim($content) : $content,
+        };
     }
 
     protected function ensureTeamHash(Team $team): Team

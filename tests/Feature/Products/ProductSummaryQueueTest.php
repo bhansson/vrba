@@ -2,10 +2,11 @@
 
 namespace Tests\Feature\Products;
 
-use App\Jobs\BaseProductAiJob;
+use App\Jobs\RunProductAiTemplateJob;
 use App\Livewire\ProductsIndex;
 use App\Models\Product;
 use App\Models\ProductAiJob;
+use App\Models\ProductAiTemplate;
 use App\Models\ProductFeed;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,6 +23,8 @@ class ProductSummaryQueueTest extends TestCase
         config()->set('services.openai.api_key', 'test-key');
 
         Queue::fake();
+
+        ProductAiTemplate::syncDefaultTemplates();
 
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -42,27 +45,24 @@ class ProductSummaryQueueTest extends TestCase
             ->call('summarizeProduct', $product->id)
             ->assertHasNoErrors();
 
-        $promptTypes = collect(config('product-ai.actions.generate_summary', []))
-            ->filter()
-            ->unique()
-            ->values();
+        $templates = ProductAiTemplate::query()
+            ->whereIn('slug', config('product-ai.actions.generate_summary', []))
+            ->get();
 
-        $promptTypes->each(function (string $promptType) use ($product): void {
+        $this->assertNotEmpty($templates, 'Expected default AI templates to be available.');
+
+        $templates->each(function (ProductAiTemplate $template) use ($product): void {
             $this->assertDatabaseHas('product_ai_jobs', [
                 'product_id' => $product->id,
-                'prompt_type' => $promptType,
+                'product_ai_template_id' => $template->id,
                 'status' => ProductAiJob::STATUS_QUEUED,
             ]);
 
-            $jobClass = data_get(config('product-ai.generations.'.$promptType, []), 'job');
-
-            $this->assertIsString($jobClass, 'Expected job class to be configured for '.$promptType);
-
-            Queue::assertPushed($jobClass, function (BaseProductAiJob $job) use ($product, $promptType): bool {
+            Queue::assertPushed(RunProductAiTemplateJob::class, function (RunProductAiTemplateJob $job) use ($product, $template): bool {
                 $jobRecord = ProductAiJob::find($job->productAiJobId);
 
                 return $jobRecord?->product_id === $product->id
-                    && $jobRecord->prompt_type === $promptType;
+                    && $jobRecord->product_ai_template_id === $template->id;
             });
         });
     }

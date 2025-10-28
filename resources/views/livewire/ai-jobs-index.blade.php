@@ -7,13 +7,6 @@
         \App\Models\ProductAiJob::STATUS_FAILED => 'bg-red-100 text-red-800 border-red-300',
     ];
 
-    $promptLabels = [
-        \App\Models\ProductAiJob::PROMPT_DESCRIPTION => 'Description',
-        \App\Models\ProductAiJob::PROMPT_DESCRIPTION_SUMMARY => 'Description Summary',
-        \App\Models\ProductAiJob::PROMPT_USPS => 'Unique Selling Points',
-        \App\Models\ProductAiJob::PROMPT_FAQ => 'FAQ',
-        \App\Models\ProductAiJob::PROMPT_REVIEW_SUMMARY => 'Review Summary',
-    ];
 @endphp
 
 <div wire:poll.10s class="max-w-6xl mx-auto py-8 sm:px-6 lg:px-8">
@@ -49,7 +42,7 @@
         <div class="min-w-full divide-y divide-gray-200">
             <div class="grid grid-cols-12 px-4 py-3 bg-gray-50 text-xs font-semibold uppercase text-gray-600 gap-2">
                 <div class="col-span-4">Product</div>
-                <div class="col-span-2">Prompt</div>
+                <div class="col-span-2">Template</div>
                 <div class="col-span-2">Status</div>
                 <div class="col-span-2">Progress</div>
                 <div class="col-span-2 text-right">Queued</div>
@@ -66,7 +59,7 @@
                         </div>
                     </div>
                     <div class="col-span-2">
-                        {{ $promptLabels[$job->prompt_type] ?? Str::headline($job->prompt_type) }}
+                        {{ $job->template?->name ?? Str::headline($job->template?->slug ?? 'Template') }}
                     </div>
                     <div class="col-span-2">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full border text-xs font-medium {{ $statusStyles[$job->status] ?? 'bg-gray-100 text-gray-800 border-gray-300' }}">

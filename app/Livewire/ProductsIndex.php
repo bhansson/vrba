@@ -2,8 +2,10 @@
 
 namespace App\Livewire;
 
+use App\Jobs\RunProductAiTemplateJob;
 use App\Models\Product;
 use App\Models\ProductAiJob;
+use App\Models\ProductAiTemplate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -63,6 +65,7 @@ class ProductsIndex extends Component
                 'latestAiDescription',
                 'latestAiUsp',
                 'latestAiFaq',
+                'latestAiGeneration.template',
             ])
             ->where('team_id', $team->id)
             ->when($this->brand !== '', function ($query) {
@@ -127,7 +130,7 @@ class ProductsIndex extends Component
         $this->loadingSummary[$productId] = true;
 
         try {
-            $promptTypes = collect(config('product-ai.actions.generate_summary', []))
+            $templateSlugs = collect(config('product-ai.actions.generate_summary', []))
                 ->filter(static fn ($value) => is_string($value) && $value !== '')
                 ->unique()
                 ->values();
@@ -140,38 +143,39 @@ class ProductsIndex extends Component
                 throw new \RuntimeException('Product is missing an SKU, cannot queue summary.');
             }
 
-            if ($promptTypes->isEmpty()) {
+            if ($templateSlugs->isEmpty()) {
                 throw new \RuntimeException('No AI generations are configured for this action.');
+            }
+
+            ProductAiTemplate::syncDefaultTemplates();
+
+            $templates = ProductAiTemplate::query()
+                ->forTeam($team->id)
+                ->active()
+                ->whereIn('slug', $templateSlugs)
+                ->orderBy('name')
+                ->get();
+
+            if ($templates->isEmpty()) {
+                throw new \RuntimeException('No matching AI templates are available for this action.');
             }
 
             $queuedLabels = [];
 
-            foreach ($promptTypes as $promptType) {
-                $generationConfig = config('product-ai.generations.'.$promptType);
-
-                if (! is_array($generationConfig) || empty($generationConfig)) {
-                    throw new \RuntimeException('Missing AI generation configuration for prompt type: '.$promptType);
-                }
-
-                $jobClass = data_get($generationConfig, 'job');
-
-                if (! is_string($jobClass) || ! class_exists($jobClass)) {
-                    throw new \RuntimeException('Invalid job class for prompt type: '.$promptType);
-                }
-
+            foreach ($templates as $template) {
                 $jobRecord = ProductAiJob::create([
                     'team_id' => $team->id,
                     'product_id' => $product->id,
                     'sku' => $product->sku,
-                    'prompt_type' => $promptType,
+                    'product_ai_template_id' => $template->id,
                     'status' => ProductAiJob::STATUS_QUEUED,
                     'progress' => 0,
                     'queued_at' => now(),
                 ]);
 
-                $jobClass::dispatch($jobRecord->id);
+                RunProductAiTemplateJob::dispatch($jobRecord->id);
 
-                $queuedLabels[] = data_get($generationConfig, 'label', Str::headline($promptType));
+                $queuedLabels[] = $template->name;
             }
 
             unset($this->summaries[$productId]);

@@ -1,4 +1,24 @@
-@php use App\Models\ProductAiJob;use Illuminate\Support\Str; @endphp
+@php
+    use Illuminate\Support\Str;
+
+    $templateItems = collect($templatePayload ?? []);
+
+    $latestGenerationUpdatedAt = $templateItems
+        ->map(fn ($item) => $item['latest']?->updated_at)
+        ->filter()
+        ->reduce(function ($carry, $timestamp) {
+            if (! $carry) {
+                return $timestamp;
+            }
+
+            return $timestamp->gt($carry) ? $timestamp : $carry;
+        });
+
+    $latestGenerationUpdatedText = $latestGenerationUpdatedAt
+        ? $latestGenerationUpdatedAt->diffForHumans()
+        : null;
+@endphp
+
 <div>
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <div class="bg-white shadow-sm sm:rounded-lg">
@@ -100,139 +120,61 @@
                     </div>
                 </div>
 
-                @php
-                    $summaryPromptType = ProductAiJob::PROMPT_DESCRIPTION_SUMMARY;
-                    $descriptionPromptType = ProductAiJob::PROMPT_DESCRIPTION;
-                    $uspPromptType = ProductAiJob::PROMPT_USPS;
-                    $faqPromptType = ProductAiJob::PROMPT_FAQ;
-
-                    $latestSummaryRecord = $product->latestAiDescriptionSummary;
-
-                    $aiGenerations = collect([
-                        [
-                            'key' => 'summary',
-                            'prompt_type' => $summaryPromptType,
-                            'label' => 'Summary',
-                            'content' => $generationContent[$summaryPromptType] ?? $latestSummaryRecord?->content,
-                            'generated_at' => $latestSummaryRecord?->created_at,
-                            'recorded_at' => $latestSummaryRecord?->updated_at,
-                            'model' => data_get($latestSummaryRecord?->meta, 'model'),
-                        ],
-                        [
-                            'key' => 'description',
-                            'prompt_type' => $descriptionPromptType,
-                            'label' => 'AI Description',
-                            'content' => $product->latestAiDescription?->content,
-                            'generated_at' => $product->latestAiDescription?->created_at,
-                            'recorded_at' => $product->latestAiDescription?->updated_at,
-                            'model' => data_get($product->latestAiDescription?->meta, 'model'),
-                        ],
-                        [
-                            'key' => 'usps',
-                            'prompt_type' => $uspPromptType,
-                            'label' => 'Unique Selling Points',
-                            'content' => $product->latestAiUsp?->content,
-                            'generated_at' => $product->latestAiUsp?->created_at,
-                            'recorded_at' => $product->latestAiUsp?->updated_at,
-                            'model' => data_get($product->latestAiUsp?->meta, 'model'),
-                        ],
-                        [
-                            'key' => 'faq',
-                            'prompt_type' => $faqPromptType,
-                            'label' => 'FAQ',
-                            'content' => $product->latestAiFaq?->content,
-                            'generated_at' => $product->latestAiFaq?->created_at,
-                            'recorded_at' => $product->latestAiFaq?->updated_at,
-                            'model' => data_get($product->latestAiFaq?->meta, 'model'),
-                        ],
-                    ])->map(function ($generation) {
-                        $hasContent = false;
-
-                        if (is_array($generation['content'])) {
-                            $hasContent = collect($generation['content'])
-                                ->filter(function ($item) {
-                                    if (is_array($item)) {
-                                        return collect($item)->filter()->isNotEmpty();
-                                    }
-
-                                    return trim((string) $item) !== '';
-                                })
-                                ->isNotEmpty();
-                        } elseif (is_string($generation['content'])) {
-                            $hasContent = trim($generation['content']) !== '';
-                        }
-
-                        $generation['has_content'] = $hasContent;
-
-                        return $generation;
-                    })->values();
-
-                    $latestGenerationUpdatedAt = $aiGenerations
-                        ->pluck('recorded_at')
-                        ->filter()
-                        ->reduce(function ($carry, $timestamp) {
-                            if (! $carry) {
-                                return $timestamp;
-                            }
-
-                            return $timestamp->gt($carry) ? $timestamp : $carry;
-                        });
-
-                    $latestGenerationUpdatedText = $latestGenerationUpdatedAt
-                        ? $latestGenerationUpdatedAt->diffForHumans()
-                        : null;
-                @endphp
-
-                @if ($aiGenerations->isNotEmpty())
+                @if ($templateItems->isNotEmpty())
                     <div class="bg-white shadow-sm sm:rounded-lg">
                         <div class="px-6 py-5 border-b border-gray-200">
                             <h2 class="text-lg font-semibold text-gray-900">AI Generated Content</h2>
                             <p class="mt-1 text-sm text-gray-600">
                                 Latest outputs created for this product.
+                                @if ($latestGenerationUpdatedText)
+                                    Last updated {{ $latestGenerationUpdatedText }}.
+                                @endif
                             </p>
                         </div>
                         <div class="px-6 py-6 text-sm text-gray-700"
-                             x-data="{ activeTab: '{{ $aiGenerations->first()['key'] }}' }">
-                            <div class="border-b border-gray-200">
-                                <nav class="-mb-px flex space-x-6" role="tablist" aria-label="AI generation tabs">
-                                    @foreach ($aiGenerations as $index => $generation)
-                                        <button
-                                                id="generation-tab-{{ $index }}"
-                                                type="button"
-                                                role="tab"
-                                                @click.prevent="activeTab = '{{ $generation['key'] }}'"
-                                                :aria-selected="(activeTab === '{{ $generation['key'] }}') ? 'true' : 'false'"
-                                                aria-controls="generation-panel-{{ $index }}"
-                                                class="px-3 py-2 text-sm font-medium border-b-2 transition-colors duration-150 focus:outline-none focus-visible:outline-none"
-                                                :class="activeTab === '{{ $generation['key'] }}' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                                        >
-                                            {{ $generation['label'] }}
-                                        </button>
-                                    @endforeach
-                                </nav>
+                             x-data="{
+                                activeKey: '{{ $templateItems->first()['key'] ?? '' }}',
+                                selectKey(event) {
+                                    this.activeKey = event.target.value;
+                                }
+                             }">
+                            <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <label for="template-selection" class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Selected template</label>
+                                    <select id="template-selection"
+                                            x-model="activeKey"
+                                            class="mt-1 w-64 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        @foreach ($templateItems as $item)
+                                            @php
+                                                $template = $item['template'];
+                                                $key = $item['key'];
+                                            @endphp
+                                            <option value="{{ $key }}">{{ $template->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
                             </div>
-                            <div class="mt-6">
-                                @foreach ($aiGenerations as $index => $generation)
-                                    @php
-                                        $promptType = $generation['prompt_type'];
-                                        $status = $generationStatus[$promptType] ?? null;
-                                        $error = $generationError[$promptType] ?? null;
-                                        $isLoading = $generationLoading[$promptType] ?? false;
-                                        $historyItems = $generationHistory[$promptType] ?? collect();
-                                    @endphp
-                                    <section
-                                            x-show="activeTab === '{{ $generation['key'] }}'"
-                                            x-cloak
-                                            role="tabpanel"
-                                            aria-labelledby="generation-tab-{{ $index }}"
-                                            id="generation-panel-{{ $index }}"
-                                            class="{{ $generation['key'] === 'summary' ? 'space-y-4' : 'space-y-3' }}"
-                                    >
+
+                            @foreach ($templateItems as $item)
+                                @php
+                                    $template = $item['template'];
+                                    $key = $item['key'];
+                                    $latest = $item['latest'];
+                                    $historyItems = $item['history'];
+                                    $status = $generationStatus[$key] ?? null;
+                                    $error = $generationError[$key] ?? null;
+                                    $isLoading = $generationLoading[$key] ?? false;
+                                    $contentType = $template->contentType();
+                                    $latestContent = $generationContent[$key] ?? $latest?->content;
+                                    $latestTimestamp = $latest?->updated_at ?? $latest?->created_at;
+                                    $latestModel = data_get($latest?->meta, 'model');
+                                @endphp
+                                <section x-show="activeKey === '{{ $key }}'" x-cloak class="space-y-3">
                                         <div class="space-y-2">
-                                            <h3 class="text-sm font-semibold text-gray-900">{{ $generation['label'] }}</h3>
+                                            <h3 class="text-sm font-semibold text-gray-900">{{ $template->name }}</h3>
                                             <div class="space-y-2">
                                                 <x-button type="button"
-                                                          wire:click="queueGeneration('{{ $promptType }}')"
+                                                          wire:click="queueGeneration({{ $template->id }})"
                                                           wire:loading.attr="disabled"
                                                           wire:target="queueGeneration">
                                                     <span wire:loading.remove
@@ -255,64 +197,66 @@
                                             </div>
                                         </div>
 
-                                        @if ($generation['key'] === 'summary')
-                                            <div class="space-y-3">
-                                                <h4 class="text-sm font-semibold text-gray-900">Latest Summary</h4>
-                                                @if ($generation['content'])
-                                                    <p class="text-gray-700">{{ $generation['content'] }}</p>
-                                                @else
-                                                    <p class="text-gray-500">No summary generated yet. Use the button
-                                                        above to queue AI jobs.</p>
-                                                @endif
-                                            </div>
-                                        @else
-                                            @switch($generation['key'])
+                                        <div class="space-y-3">
+                                            <h4 class="text-sm font-semibold text-gray-900">Latest</h4>
+                                            @switch($contentType)
                                                 @case('usps')
                                                     @php
-                                                        $usps = collect(is_array($generation['content']) ? $generation['content'] : [])
-                                                            ->map(fn ($value) => trim(is_array($value) ? implode(' ', $value) : (string) $value))
+                                                        $uspItems = collect(is_array($latestContent) ? $latestContent : [])
+                                                            ->map(function ($value) {
+                                                                if (is_array($value)) {
+                                                                    $value = implode(' ', $value);
+                                                                }
+
+                                                                return trim((string) $value);
+                                                            })
                                                             ->filter()
                                                             ->values();
                                                     @endphp
-                                                    @if ($usps->isNotEmpty())
-                                                        <ul class="list-disc space-y-2 pl-5 text-gray-700">
-                                                            @foreach ($usps as $usp)
-                                                                <li>{{ $usp }}</li>
+                                                    @if ($uspItems->isNotEmpty())
+                                                        <ul class="grid gap-2">
+                                                            @foreach ($uspItems as $usp)
+                                                                <li class="flex items-start gap-2">
+                                                                    <span class="mt-1 size-1.5 rounded-full bg-indigo-500"></span>
+                                                                    <span class="text-gray-700">{{ $usp }}</span>
+                                                                </li>
                                                             @endforeach
                                                         </ul>
                                                     @else
-                                                        <p class="text-gray-500">No unique selling points generated yet.
-                                                            Use the button above to queue AI jobs.</p>
+                                                        <p class="text-gray-500">No unique selling points generated yet. Use the button above to queue AI jobs.</p>
                                                     @endif
                                                     @break
 
                                                 @case('faq')
                                                     @php
-                                                        $faqEntries = collect(is_array($generation['content']) ? $generation['content'] : [])
+                                                        $faqEntries = collect(is_array($latestContent) ? $latestContent : [])
                                                             ->map(function ($entry) {
                                                                 if (is_array($entry)) {
-                                                                    return [
-                                                                        'question' => trim((string) ($entry['question'] ?? '')),
-                                                                        'answer' => trim((string) ($entry['answer'] ?? '')),
-                                                                    ];
+                                                                    $question = trim((string) ($entry['question'] ?? ''));
+                                                                    $answer = trim((string) ($entry['answer'] ?? ''));
+                                                                } else {
+                                                                    $question = '';
+                                                                    $answer = trim((string) $entry);
+                                                                }
+
+                                                                if ($question === '' && $answer === '') {
+                                                                    return null;
                                                                 }
 
                                                                 return [
-                                                                    'question' => '',
-                                                                    'answer' => trim((string) $entry),
+                                                                    'question' => $question !== '' ? $question : 'Question',
+                                                                    'answer' => $answer !== '' ? $answer : 'Answer forthcoming.',
                                                                 ];
                                                             })
-                                                            ->filter(function ($entry) {
-                                                                return ($entry['question'] !== '') || ($entry['answer'] !== '');
-                                                            })
+                                                            ->filter()
                                                             ->values();
                                                     @endphp
                                                     @if ($faqEntries->isNotEmpty())
                                                         <div class="space-y-4 text-gray-700">
                                                             @foreach ($faqEntries as $faq)
                                                                 <div class="space-y-1">
-                                                                    <p class="font-medium text-gray-900">Q: {{ $faq['question'] ?: 'Question' }}</p>
-                                                                    <p>A: {{ $faq['answer'] ?: 'Answer forthcoming.' }}</p>
+                                                                    <p class="font-medium text-gray-900">Q: {{ $faq['question'] }}</p>
+                                                                    <p>A: {{ $faq['answer'] }}</p>
                                                                 </div>
                                                             @endforeach
                                                         </div>
@@ -322,84 +266,92 @@
                                                     @break
 
                                                 @default
-                                                    @if ($generation['content'])
-                                                        <p class="whitespace-pre-wrap text-gray-700">{{ $generation['content'] }}</p>
+                                                    @php
+                                                        $textContent = trim(is_string($latestContent) ? $latestContent : '');
+                                                    @endphp
+                                                    @if ($textContent !== '')
+                                                        <p class="whitespace-pre-wrap text-gray-700">{{ $textContent }}</p>
                                                     @else
                                                         <p class="text-gray-500">No content generated yet. Use the button above
                                                             to queue AI jobs.</p>
                                                     @endif
                                             @endswitch
-                                        @endif
+                                        </div>
 
-                                            <p class="text-xs text-gray-500">
-                                                @if ($generation['recorded_at'])
-                                                    Generated {{ $generation['recorded_at']->diffForHumans() }}
-                                                @else
-                                                    Generated date unavailable
-                                                @endif
-                                                @if (! empty($generation['model']))
-                                                    ({{ \Illuminate\Support\Str::upper($generation['model']) }})
-                                                @endif
-                                            </p>
+                                        <p class="text-xs text-gray-500">
+                                            @if ($latestTimestamp)
+                                                Generated {{ $latestTimestamp->diffForHumans() }}
+                                            @else
+                                                Generated date unavailable
+                                            @endif
+                                            @if (! empty($latestModel))
+                                                ({{ Str::upper($latestModel) }})
+                                            @endif
+                                        </p>
 
                                         @if ($historyItems->isNotEmpty())
                                             <div class="space-y-3">
                                                 <h4 class="text-sm font-semibold text-gray-900">History</h4>
                                                 <div class="space-y-3">
                                                     @foreach ($historyItems as $history)
+                                                        @php
+                                                            $historyContent = $history->content ?? '';
+
+                                                            if (is_array($historyContent)) {
+                                                                if ($contentType === 'usps') {
+                                                                    $historyContent = collect($historyContent)
+                                                                        ->map(function ($value) {
+                                                                            if (is_array($value)) {
+                                                                                $value = implode(' ', $value);
+                                                                            }
+
+                                                                            return '• '.trim((string) $value);
+                                                                        })
+                                                                        ->filter()
+                                                                        ->implode("\n");
+                                                                } elseif ($contentType === 'faq') {
+                                                                    $historyContent = collect($historyContent)
+                                                                        ->map(function ($entry) {
+                                                                            if (is_array($entry)) {
+                                                                                $question = trim((string) ($entry['question'] ?? 'Question'));
+                                                                                $answer = trim((string) ($entry['answer'] ?? 'Answer forthcoming.'));
+                                                                            } else {
+                                                                                $question = 'Question';
+                                                                                $answer = trim((string) $entry) ?: 'Answer forthcoming.';
+                                                                            }
+
+                                                                            return "Q: {$question}\nA: {$answer}";
+                                                                        })
+                                                                        ->filter()
+                                                                        ->implode("\n\n");
+                                                                } else {
+                                                                    $historyContent = json_encode($historyContent, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                                                                }
+                                                            }
+
+                                                            $historyContent = trim((string) $historyContent);
+                                                            $truncatedContent = Str::limit($historyContent, 100, '');
+                                                            $hasMoreContent = Str::length($historyContent) > Str::length($truncatedContent);
+                                                            $historyModel = data_get($history->meta, 'model');
+                                                            $historyTimestamp = $history->updated_at ?? $history->created_at;
+                                                        @endphp
                                                         <article class="rounded-lg border border-gray-200 p-4 space-y-3"
                                                                  x-data="{ isExpanded: false }">
                                                             <div class="flex flex-wrap items-center justify-between gap-3">
                                                                 <span class="text-xs text-gray-500">
-                                                                    {{ $history->created_at ? $history->created_at->format('M j, Y H:i') : 'Unknown' }}
+                                                                    {{ $historyTimestamp ? $historyTimestamp->format('M j, Y H:i') : 'Unknown' }}
                                                                 </span>
                                                                 <button
-                                                                        type="button"
-                                                                        wire:click="promoteGeneration('{{ $promptType }}', {{ $history->id }})"
-                                                                        wire:loading.attr="disabled"
-                                                                        wire:target="promoteGeneration"
-                                                                        class="inline-flex items-center gap-1 border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-500 transition hover:border-gray-300 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-200 disabled:opacity-50"
+                                                                    type="button"
+                                                                    wire:click="promoteGeneration({{ $history->id }})"
+                                                                    wire:loading.attr="disabled"
+                                                                    wire:target="promoteGeneration"
+                                                                    class="inline-flex items-center gap-1 border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-500 transition hover:border-gray-300 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-200 disabled:opacity-50"
                                                                 >
                                                                     <span wire:loading.remove wire:target="promoteGeneration">Promote</span>
                                                                     <span wire:loading wire:target="promoteGeneration">Promoting…</span>
                                                                 </button>
                                                             </div>
-                                                            @php
-                                                                $rawContent = $history->content ?? '';
-
-                                                                if (is_array($rawContent)) {
-                                                                    if ($promptType === \App\Models\ProductAiJob::PROMPT_USPS) {
-                                                                        $rawContent = collect($rawContent)
-                                                                            ->map(fn ($value) => '• '.trim(is_array($value) ? implode(' ', $value) : (string) $value))
-                                                                            ->filter()
-                                                                            ->implode("\n");
-                                                                    } elseif ($promptType === \App\Models\ProductAiJob::PROMPT_FAQ) {
-                                                                        $rawContent = collect($rawContent)
-                                                                            ->map(function ($entry) {
-                                                                                if (is_array($entry)) {
-                                                                                    $question = trim((string) ($entry['question'] ?? 'Question'));
-                                                                                    $answer = trim((string) ($entry['answer'] ?? 'Answer forthcoming.'));
-                                                                                } else {
-                                                                                    $question = 'Question';
-                                                                                    $answer = trim((string) $entry) ?: 'Answer forthcoming.';
-                                                                                }
-
-                                                                                return "Q: {$question}\nA: {$answer}";
-                                                                            })
-                                                                            ->filter()
-                                                                            ->implode("\n\n");
-                                                                    } else {
-                                                                        $rawContent = json_encode($rawContent, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-                                                                    }
-                                                                }
-
-                                                                $rawContent = (string) $rawContent;
-                                                                $fullContent = preg_replace('/^\s+/u', '', $rawContent) ?? '';
-                                                                $truncatedContent = \Illuminate\Support\Str::limit($fullContent, 100, '');
-                                                                $hasMoreContent = \Illuminate\Support\Str::length($fullContent) > \Illuminate\Support\Str::length($truncatedContent);
-                                                                $historyModel = data_get($history->meta, 'model');
-                                                                $historyTimestamp = $history->updated_at ?? $history->created_at;
-                                                            @endphp
                                                             <div class="space-y-2">
                                                                 <p class="text-xs text-gray-500">
                                                                     @if ($historyTimestamp)
@@ -408,13 +360,15 @@
                                                                         Generated date unavailable
                                                                     @endif
                                                                     @if ($historyModel)
-                                                                        ({{ \Illuminate\Support\Str::upper($historyModel) }})
+                                                                        ({{ Str::upper($historyModel) }})
                                                                     @endif
                                                                 </p>
-                                                                <p class="whitespace-pre-wrap text-gray-700" x-show="!isExpanded">{{ $hasMoreContent ? \Illuminate\Support\Str::of($truncatedContent)->trim()->append('…') : $fullContent }}</p>
+                                                                <p class="whitespace-pre-wrap text-gray-700" x-show="!isExpanded">
+                                                                    {{ $hasMoreContent ? Str::of($truncatedContent)->trim()->append('…') : $historyContent }}
+                                                                </p>
                                                                 @if ($hasMoreContent)
                                                                     <template x-if="isExpanded">
-                                                                        <p class="whitespace-pre-wrap text-gray-700">{{ $fullContent }}</p>
+                                                                        <p class="whitespace-pre-wrap text-gray-700">{{ $historyContent }}</p>
                                                                     </template>
                                                                     <button type="button"
                                                                             class="text-sm font-medium text-indigo-600 hover:text-indigo-800"
@@ -429,9 +383,8 @@
                                                 </div>
                                             </div>
                                         @endif
-                                    </section>
-                                @endforeach
-                            </div>
+                                </section>
+                            @endforeach
                         </div>
                     </div>
                 @endif
