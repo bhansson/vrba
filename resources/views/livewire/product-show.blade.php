@@ -113,7 +113,7 @@
 
                         <div>
                             <h3 class="text-sm font-medium text-gray-900">Description</h3>
-                            <p class="mt-2 whitespace-pre-wrap text-gray-700">
+                            <p class="mt-2 text-gray-700">
                                 {{ $product->description ?: 'No description provided.' }}
                             </p>
                         </div>
@@ -270,7 +270,7 @@
                                                         $textContent = trim(is_string($latestContent) ? $latestContent : '');
                                                     @endphp
                                                     @if ($textContent !== '')
-                                                        <p class="whitespace-pre-wrap text-gray-700">{{ $textContent }}</p>
+                                                        <p class="text-gray-700">{{ $textContent }}</p>
                                                     @else
                                                         <p class="text-gray-500">No content generated yet. Use the button above
                                                             to queue AI jobs.</p>
@@ -363,12 +363,12 @@
                                                                         ({{ Str::upper($historyModel) }})
                                                                     @endif
                                                                 </p>
-                                                                <p class="whitespace-pre-wrap text-gray-700" x-show="!isExpanded">
+                                                                <p class="text-gray-700" x-show="!isExpanded">
                                                                     {{ $hasMoreContent ? Str::of($truncatedContent)->trim()->append('…') : $historyContent }}
                                                                 </p>
                                                                 @if ($hasMoreContent)
                                                                     <template x-if="isExpanded">
-                                                                        <p class="whitespace-pre-wrap text-gray-700">{{ $historyContent }}</p>
+                                                                        <p class="text-gray-700">{{ $historyContent }}</p>
                                                                     </template>
                                                                     <button type="button"
                                                                             class="text-sm font-medium text-indigo-600 hover:text-indigo-800"
