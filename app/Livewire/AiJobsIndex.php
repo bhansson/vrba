@@ -12,12 +12,12 @@ class AiJobsIndex extends Component
 {
     use WithPagination;
 
-    public int $perPage = 15;
-    public string $filter = 'active';
+    public int $perPage = 100;
+    public string $filter = 'all';
 
     protected $queryString = [
-        'filter' => ['except' => 'active'],
-        'perPage' => ['except' => 15],
+        'filter' => ['except' => 'all'],
+        'perPage' => ['except' => 100],
     ];
 
     public function updatingPerPage(): void
@@ -63,10 +63,10 @@ class AiJobsIndex extends Component
     protected function statusOptions(): Collection
     {
         return collect([
+            'all' => 'All jobs',
             'active' => 'Active',
             'completed' => 'Completed',
             'failed' => 'Failed',
-            'all' => 'All jobs',
         ]);
     }
 }

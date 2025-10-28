@@ -59,10 +59,78 @@
             </div>
         </div>
 
+        @if ($bulkStatusMessage)
+            <div class="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                {{ $bulkStatusMessage }}
+            </div>
+        @endif
+
+        @if ($bulkErrorMessage)
+            <div class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {{ $bulkErrorMessage }}
+            </div>
+        @endif
+
+        @php
+            $selectedCount = count($selectedProducts);
+            $bulkButtonDisabled = $templates->isEmpty() || $selectedCount === 0 || ! $selectedTemplateId;
+        @endphp
+
+        <div class="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-gray-600">
+                    <p>Select products with the checkboxes to queue AI generation in bulk.</p>
+                    <p class="mt-1 font-medium text-gray-900">
+                        {{ $selectedCount }} {{ Str::plural('product', $selectedCount) }} selected
+                    </p>
+                </div>
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                    <div class="w-full sm:w-64">
+                        <label for="bulk-template" class="sr-only">Choose template</label>
+                        <select
+                            id="bulk-template"
+                            wire:model.live="selectedTemplateId"
+                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                            @disabled($templates->isEmpty())
+                        >
+                            <option value="">Select template…</option>
+                            @foreach ($templates as $template)
+                                <option value="{{ $template->id }}">{{ $template->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="bulkGenerate"
+                        wire:loading.attr="disabled"
+                        wire:target="bulkGenerate"
+                        @disabled($bulkButtonDisabled)
+                        class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <span wire:loading.remove wire:target="bulkGenerate">Queue AI Generation</span>
+                        <span wire:loading.inline wire:target="bulkGenerate">Queueing…</span>
+                    </button>
+                </div>
+            </div>
+            @if ($templates->isEmpty())
+                <p class="mt-2 text-xs text-gray-500">
+                    No active AI templates are available yet. Create one to enable bulk generation.
+                </p>
+            @endif
+        </div>
+
         <div class="bg-white shadow sm:rounded-lg">
             <div class="divide-y divide-gray-200">
                 <div class="hidden px-4 py-3 bg-gray-50 text-xs font-semibold uppercase text-gray-600 sm:grid sm:grid-cols-12">
-                    <div class="col-span-8">Title</div>
+                    <div class="col-span-1 flex items-center">
+                        <input
+                            type="checkbox"
+                            wire:model.live="bulkSelectAll"
+                            class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            aria-label="Select all visible products"
+                        />
+                    </div>
+                    <div class="col-span-7">Title</div>
                     <div class="col-span-2">Last AI Generation</div>
                     <div class="col-span-2 text-right">Actions</div>
                 </div>
@@ -74,7 +142,16 @@
                         $latestGenerationTimestamp = $latestGenerationRecord?->updated_at ?? $latestGenerationRecord?->created_at;
                     @endphp
                     <div wire:key="product-{{ $product->id }}" class="flex flex-col gap-4 px-4 py-5 transition-colors sm:grid sm:grid-cols-12 sm:items-center hover:bg-gray-50">
-                        <div class="sm:col-span-8">
+                        <div class="flex items-center sm:col-span-1 sm:justify-center">
+                            <input
+                                type="checkbox"
+                                value="{{ $product->id }}"
+                                wire:model.live="selectedProducts"
+                                class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                aria-label="Select {{ $product->title ?: 'Untitled product' }}"
+                            />
+                        </div>
+                        <div class="sm:col-span-7">
                             <div class="text-sm font-semibold text-gray-900">
                                 {{ $product->title ?: 'Untitled product' }}
                             </div>
