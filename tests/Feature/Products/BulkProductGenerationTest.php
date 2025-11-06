@@ -132,4 +132,45 @@ class BulkProductGenerationTest extends TestCase
             'product_id' => $withoutSku->id,
         ]);
     }
+
+    public function test_products_index_filters_by_language(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $feedEn = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+            'language' => 'en',
+        ]);
+
+        $feedSv = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+            'language' => 'sv',
+        ]);
+
+        $englishProduct = Product::factory()
+            ->for($feedEn, 'feed')
+            ->create([
+                'team_id' => $team->id,
+                'title' => 'English Product',
+                'brand' => 'Acme EN',
+            ]);
+
+        $swedishProduct = Product::factory()
+            ->for($feedSv, 'feed')
+            ->create([
+                'team_id' => $team->id,
+                'title' => 'Svensk Produkt',
+                'brand' => 'Acme SV',
+            ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(ProductsIndex::class)
+            ->assertSee($englishProduct->title)
+            ->assertSee($swedishProduct->title)
+            ->set('language', 'sv')
+            ->assertSee($swedishProduct->title)
+            ->assertDontSee($englishProduct->title);
+    }
 }

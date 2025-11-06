@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductAiGeneration;
 use App\Models\ProductAiJob;
 use App\Models\ProductAiTemplate;
+use App\Models\ProductFeed;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -41,6 +42,7 @@ class ProductShow extends Component
             'generationError' => $this->generationError,
             'generationLoading' => $this->generationLoading,
             'generationContent' => $this->generationContent,
+            'languageLabels' => ProductFeed::languageOptions(),
         ]);
     }
 
@@ -151,7 +153,7 @@ class ProductShow extends Component
 
         return Product::query()
             ->with([
-                'feed:id,name',
+                'feed:id,name,language',
                 'aiGenerations' => static function ($query) use ($templateIds, $historyLimit, $multiplier) {
                     $query->with('template')
                         ->whereIn('product_ai_template_id', $templateIds)

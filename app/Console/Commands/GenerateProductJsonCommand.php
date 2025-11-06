@@ -57,6 +57,7 @@ class GenerateProductJsonCommand extends Command
                 ->where('team_id', $team->id)
                 ->whereNotNull('sku')
                 ->with([
+                    'feed:id,language',
                     'aiGenerations' => static function ($query) use ($templateIds) {
                         $query->with('template')
                             ->whereIn('product_ai_template_id', $templateIds)
@@ -149,11 +150,13 @@ class GenerateProductJsonCommand extends Command
         return [
             'id' => $product->id,
             'team_id' => $product->team_id,
+            'team_hash' => $team->public_hash,
             'sku' => $product->sku,
             'gtin' => $product->gtin,
             'title' => $product->title,
             'description' => $product->description,
             'url' => $product->url,
+            'language' => optional($product->feed)->language,
             'created_at' => optional($product->created_at)->toIso8601String(),
             'updated_at' => optional($product->updated_at)->toIso8601String(),
             'ai' => $aiPayload,

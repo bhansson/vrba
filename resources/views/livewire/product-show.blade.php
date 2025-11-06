@@ -46,6 +46,14 @@
                             <span class="font-medium text-gray-700">Feed:</span>
                             <span>{{ $product->feed?->name ?: '—' }}</span>
                         </div>
+                        <div>
+                            <span class="font-medium text-gray-700">Language:</span>
+                            @php
+                                $feedLanguageCode = $product->feed?->language;
+                                $feedLanguageLabel = $feedLanguageCode ? ($languageLabels[$feedLanguageCode] ?? Str::upper($feedLanguageCode)) : null;
+                            @endphp
+                            <span>{{ $feedLanguageLabel ? $feedLanguageLabel.' ('.Str::upper($feedLanguageCode).')' : '—' }}</span>
+                        </div>
                     </div>
                     <div class="flex flex-wrap gap-3">
                         @if ($product->url)

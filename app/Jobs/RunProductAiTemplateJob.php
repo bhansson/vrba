@@ -65,7 +65,7 @@ class RunProductAiTemplateJob implements ShouldQueue
         ])->save();
 
         $product = Product::query()
-            ->with('team')
+            ->with(['team', 'feed'])
             ->findOrFail($jobRecord->product_id);
 
         $apiKey = config('laravel-openrouter.api_key');

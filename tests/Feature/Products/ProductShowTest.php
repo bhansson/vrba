@@ -32,6 +32,7 @@ class ProductShowTest extends TestCase
             ->create([
                 'team_id' => $team->id,
                 'title' => 'Example Product Title',
+                'brand' => 'Acme',
             ]);
 
         $this->actingAs($user);
@@ -55,6 +56,7 @@ class ProductShowTest extends TestCase
             ->for($foreignFeed, 'feed')
             ->create([
                 'team_id' => $otherUser->currentTeam->id,
+                'brand' => 'Acme',
             ]);
 
         $this->actingAs($user);
@@ -80,6 +82,7 @@ class ProductShowTest extends TestCase
             ->for($feed, 'feed')
             ->create([
                 'team_id' => $team->id,
+                'brand' => 'Acme',
             ]);
 
         $this->actingAs($user);

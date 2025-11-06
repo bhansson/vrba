@@ -19,6 +19,7 @@ class ProductFeedFactory extends Factory
             'team_id' => Team::factory(),
             'name' => fake()->company().' Feed',
             'feed_url' => fake()->optional()->url(),
+            'language' => fake()->randomElement(array_keys(ProductFeed::languageOptions())),
             'field_mappings' => [
                 'sku' => 'g:id',
                 'title' => 'g:title',

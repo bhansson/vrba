@@ -25,7 +25,7 @@
                     </div>
                 @endif
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div class="space-y-2">
                         <x-label for="feedName" value="Feed Name" />
                         <x-input id="feedName" type="text" class="w-full" wire:model.defer="feedName" />
@@ -36,6 +36,19 @@
                         <x-label for="feedUrl" value="Feed URL" />
                         <x-input id="feedUrl" type="url" class="w-full" placeholder="https://example.com/products.xml" wire:model.defer="feedUrl" />
                         <x-input-error for="feedUrl" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <x-label for="feedLanguage" value="Language" />
+                        <select id="feedLanguage" wire:model.defer="language" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                            @foreach ($languageOptions as $code => $label)
+                                <option value="{{ $code }}">{{ $label }} ({{ Str::upper($code) }})</option>
+                            @endforeach
+                        </select>
+                        <x-input-error for="language" />
+                        <p class="text-xs text-gray-500">
+                            Choose the market language that matches this catalog feed.
+                        </p>
                     </div>
                 </div>
 
@@ -113,6 +126,7 @@
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-4 py-2 text-left font-semibold text-gray-700 uppercase tracking-wider text-xs">Name</th>
+                                    <th class="px-4 py-2 text-left font-semibold text-gray-700 uppercase tracking-wider text-xs">Language</th>
                                     <th class="px-4 py-2 text-left font-semibold text-gray-700 uppercase tracking-wider text-xs">Products</th>
                                     <th class="px-4 py-2 text-left font-semibold text-gray-700 uppercase tracking-wider text-xs">Feed URL</th>
                                     <th class="px-4 py-2 text-left font-semibold text-gray-700 uppercase tracking-wider text-xs">Updated</th>
@@ -124,6 +138,13 @@
                                     <tr>
                                         <td class="px-4 py-2 font-medium text-gray-900">
                                             {{ $feed->name }}
+                                        </td>
+                                        <td class="px-4 py-2 text-gray-700">
+                                            @php
+                                                $languageCode = $feed->language;
+                                                $languageLabel = $languageOptions[$languageCode] ?? Str::upper($languageCode);
+                                            @endphp
+                                            {{ $languageLabel }} <span class="text-xs uppercase text-gray-400">({{ Str::upper($languageCode) }})</span>
                                         </td>
                                         <td class="px-4 py-2 text-gray-700">
                                             {{ $feed->products_count }}

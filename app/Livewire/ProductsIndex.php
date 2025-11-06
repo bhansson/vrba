@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Jobs\RunProductAiTemplateJob;
 use App\Models\Product;
+use App\Models\ProductFeed;
 use App\Models\ProductAiJob;
 use App\Models\ProductAiTemplate;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +21,7 @@ class ProductsIndex extends Component
     public int $perPage = 100;
     public string $search = '';
     public string $brand = '';
+    public string $language = '';
     public array $summaries = [];
     public array $summaryErrors = [];
     public array $summaryStatuses = [];
@@ -35,6 +37,7 @@ class ProductsIndex extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'brand' => ['except' => ''],
+        'language' => ['except' => ''],
     ];
 
     public function mount(): void
@@ -58,6 +61,12 @@ class ProductsIndex extends Component
     {
         $this->selectedProducts = $this->sanitizeProductIds($this->selectedProducts);
         $this->updateBulkSelectAllState();
+    }
+
+    public function updatingLanguage(): void
+    {
+        $this->resetPage();
+        $this->resetSelectionState();
     }
 
     public function updatedBulkSelectAll(bool $value): void
@@ -218,6 +227,11 @@ class ProductsIndex extends Component
             ->where('team_id', $team->id)
             ->whereNotNull('brand')
             ->where('brand', '!=', '')
+            ->when($this->language !== '', function ($query): void {
+                $query->whereHas('feed', function ($feedQuery): void {
+                    $feedQuery->where('language', $this->language);
+                });
+            })
             ->select('brand')
             ->distinct()
             ->orderBy('brand')
@@ -241,6 +255,8 @@ class ProductsIndex extends Component
             'products' => $products,
             'brands' => $brands,
             'templates' => $this->availableTemplates($team->id),
+            'languages' => $this->languagesForTeam($team->id),
+            'languageLabels' => ProductFeed::languageOptions(),
         ]);
     }
 
@@ -267,7 +283,7 @@ class ProductsIndex extends Component
 
         return Product::query()
             ->with([
-                'feed:id,name',
+                'feed:id,name,language',
                 'latestAiDescriptionSummary',
                 'latestAiDescription',
                 'latestAiUsp',
@@ -277,6 +293,11 @@ class ProductsIndex extends Component
             ->where('team_id', $teamId)
             ->when($this->brand !== '', function ($query) {
                 $query->where('brand', $this->brand);
+            })
+            ->when($this->language !== '', function ($query): void {
+                $query->whereHas('feed', function ($feedQuery): void {
+                    $feedQuery->where('language', $this->language);
+                });
             })
             ->when($tokens->isNotEmpty(), function ($query) use ($tokens) {
                 $query->where(function ($builder) use ($tokens) {
@@ -311,6 +332,24 @@ class ProductsIndex extends Component
             ->active()
             ->orderBy('name')
             ->get(['id', 'name']);
+    }
+
+    protected function languagesForTeam(int $teamId): Collection
+    {
+        $labels = ProductFeed::languageOptions();
+
+        return ProductFeed::query()
+            ->where('team_id', $teamId)
+            ->whereNotNull('language')
+            ->where('language', '!=', '')
+            ->select('language')
+            ->distinct()
+            ->orderBy('language')
+            ->pluck('language')
+            ->sortBy(function ($code) use ($labels) {
+                return $labels[$code] ?? $code;
+            }, SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
     }
 
     public function summarizeProduct(int $productId): void

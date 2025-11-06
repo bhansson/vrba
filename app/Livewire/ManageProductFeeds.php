@@ -25,6 +25,9 @@ class ManageProductFeeds extends Component
     #[Validate('nullable|url|max:2048')]
     public string $feedUrl = '';
 
+    #[Validate(ProductFeed::LANGUAGE_VALIDATION_RULE)]
+    public string $language = 'en';
+
     #[Validate('nullable|file|max:5120|mimetypes:text/xml,application/xml,application/rss+xml,text/csv,text/plain,application/octet-stream')]
     public $feedFile;
 
@@ -299,12 +302,16 @@ class ManageProductFeeds extends Component
                 return;
             }
 
-            DB::transaction(function () use ($team, $items, $parsed): void {
-                $feed = $this->findOrCreateFeed($team->id);
+            $language = $this->normalizedLanguage();
+            $this->language = $language;
+
+            DB::transaction(function () use ($team, $items, $parsed, $language): void {
+                $feed = $this->findOrCreateFeed($team->id, $language);
 
                 $feed->forceFill([
                     'name' => $this->resolveFeedName(),
                     'feed_url' => $this->feedUrl ?: null,
+                    'language' => $language,
                     'field_mappings' => $this->mapping,
                 ])->save();
 
@@ -742,9 +749,11 @@ class ManageProductFeeds extends Component
         return $value !== '' ? $value : null;
     }
 
-    protected function findOrCreateFeed(int $teamId): ProductFeed
+    protected function findOrCreateFeed(int $teamId, string $language): ProductFeed
     {
-        $query = ProductFeed::query()->where('team_id', $teamId);
+        $query = ProductFeed::query()
+            ->where('team_id', $teamId)
+            ->where('language', $language);
 
         if ($this->feedUrl) {
             $query->where('feed_url', $this->feedUrl);
@@ -753,6 +762,19 @@ class ManageProductFeeds extends Component
         }
 
         return $query->first() ?? new ProductFeed(['team_id' => $teamId]);
+    }
+
+    protected function normalizedLanguage(): string
+    {
+        $language = Str::lower(trim($this->language));
+
+        if ($language === '') {
+            return 'en';
+        }
+
+        return array_key_exists($language, ProductFeed::languageOptions())
+            ? $language
+            : 'en';
     }
 
     protected function suggestMappings(array $fields): void
@@ -797,6 +819,8 @@ class ManageProductFeeds extends Component
 
     public function render()
     {
-        return view('livewire.manage-product-feeds');
+        return view('livewire.manage-product-feeds', [
+            'languageOptions' => ProductFeed::languageOptions(),
+        ]);
     }
 }

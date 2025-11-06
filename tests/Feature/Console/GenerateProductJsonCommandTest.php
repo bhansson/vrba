@@ -5,6 +5,7 @@ namespace Tests\Feature\Console;
 use App\Models\Product;
 use App\Models\ProductAiGeneration;
 use App\Models\ProductAiTemplate;
+use App\Models\ProductFeed;
 use App\Models\Team;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -35,10 +36,16 @@ class GenerateProductJsonCommandTest extends TestCase
     public function test_it_generates_json_exports_for_products(): void
     {
         $team = Team::factory()->create();
+        $feed = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+            'language' => 'sv',
+        ]);
         $product = Product::factory()
             ->for($team)
+            ->for($feed, 'feed')
             ->create([
                 'sku' => 'SKU-123',
+                'brand' => 'Test Brand',
             ]);
 
         $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();
@@ -102,6 +109,7 @@ class GenerateProductJsonCommandTest extends TestCase
 
         $this->assertSame($product->sku, $payload['sku']);
         $this->assertSame($team->public_hash, $payload['team_hash']);
+        $this->assertSame('sv', $payload['language']);
         $this->assertSame($summary->content, $payload['ai']['description_summary']['content']);
         $this->assertArrayNotHasKey('meta', $payload['ai']['description_summary']);
         $this->assertSame(
@@ -132,6 +140,7 @@ class GenerateProductJsonCommandTest extends TestCase
             ->for($team)
             ->create([
                 'sku' => 'SKU-456',
+                'brand' => 'Test Brand',
             ]);
 
         $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();
@@ -171,6 +180,7 @@ class GenerateProductJsonCommandTest extends TestCase
             ->for($team)
             ->create([
                 'sku' => 'SKU-789',
+                'brand' => 'Test Brand',
             ]);
 
         $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();
@@ -229,6 +239,7 @@ class GenerateProductJsonCommandTest extends TestCase
             ->for($team)
             ->create([
                 'sku' => 'SKU-999',
+                'brand' => 'Test Brand',
             ]);
 
         $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();

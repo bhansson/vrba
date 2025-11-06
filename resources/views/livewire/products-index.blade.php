@@ -33,6 +33,24 @@
                     @endif
                 </div>
 
+                <div class="flex-1 sm:flex-none sm:w-40">
+                    <label for="language-filter" class="sr-only">Filter by language</label>
+                    <select
+                        id="language-filter"
+                        wire:model.live="language"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                        aria-label="Filter by language"
+                    >
+                        <option value="">All languages</option>
+                        @foreach ($languages as $languageOption)
+                            @php
+                                $languageLabel = $languageLabels[$languageOption] ?? Str::upper($languageOption);
+                            @endphp
+                            <option value="{{ $languageOption }}">{{ $languageLabel }} ({{ Str::upper($languageOption) }})</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="flex-1 sm:flex-none sm:w-56">
                     <label for="brand-filter" class="sr-only">Filter by brand</label>
                     <select
@@ -160,6 +178,11 @@
                                 <span>SKU: {{ $product->sku ?: '—' }}</span>
                                 <span>GTIN: {{ $product->gtin ?: '—' }}</span>
                                 <span>Updated {{ $product->updated_at->diffForHumans() }}</span>
+                                @php
+                                    $productLanguageCode = $product->feed?->language;
+                                    $productLanguageLabel = $productLanguageCode ? ($languageLabels[$productLanguageCode] ?? Str::upper($productLanguageCode)) : null;
+                                @endphp
+                                <span>Language: {{ $productLanguageLabel ? $productLanguageLabel.' ('.Str::upper($productLanguageCode).')' : '—' }}</span>
                             </div>
                             @if ($product->feed?->name)
                                 <div class="mt-1 text-xs text-gray-500">
