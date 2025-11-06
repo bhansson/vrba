@@ -65,7 +65,7 @@ class ProductShowTest extends TestCase
 
     public function test_queue_generation_dispatches_job_from_details_page(): void
     {
-        config()->set('services.openai.api_key', 'test-key');
+        config()->set('laravel-openrouter.api_key', 'test-key');
 
         Queue::fake();
 

@@ -10,13 +10,15 @@ use App\Support\ProductAiContentParser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use GuzzleHttp\Exception\GuzzleException;
+use MoeMizrak\LaravelOpenrouter\DTO\ChatData;
+use MoeMizrak\LaravelOpenrouter\DTO\MessageData;
+use MoeMizrak\LaravelOpenrouter\Facades\LaravelOpenRouter;
 use RuntimeException;
 use Throwable;
 
@@ -66,97 +68,128 @@ class RunProductAiTemplateJob implements ShouldQueue
             ->with('team')
             ->findOrFail($jobRecord->product_id);
 
-        $apiKey = config('services.openai.api_key');
-        $baseUrl = rtrim(config('services.openai.base_url', 'https://api.openai.com/v1'), '/');
+        $apiKey = config('laravel-openrouter.api_key');
 
         if (! $apiKey) {
-            throw new RuntimeException('OpenAI API key is not configured.');
+            throw new RuntimeException('AI provider API key is not configured.');
         }
 
         try {
-            $messages = $this->buildMessages($template, $product);
+            $messages = collect($this->buildMessages($template, $product))
+                ->map(fn (array $message) => new MessageData(
+                    role: (string) Arr::get($message, 'role', 'user'),
+                    content: Arr::get($message, 'content')
+                ))
+                ->all();
+
             $options = $template->options();
-            $timeout = (int) ($options['timeout'] ?? 30);
             unset($options['timeout']);
 
-            $payload = array_merge([
-                'model' => Arr::get($template->settings, 'model', config('services.openai.model', 'gpt-5')),
+            $model = Arr::get($template->settings, 'model', config('services.openrouter.model', 'openrouter/auto'));
+
+            $chatDataPayload = array_merge($options, [
                 'messages' => $messages,
-            ], $options);
-
-            $response = Http::withToken($apiKey)
-                ->timeout($timeout)
-                ->acceptJson()
-                ->withOptions([
-                    'http_version' => CURL_HTTP_VERSION_1_1,
-                ])
-                ->retry(
-                    3,
-                    500,
-                    fn (Throwable $exception) => $exception instanceof ConnectionException,
-                    throw: false
-                )
-                ->post($baseUrl.'/chat/completions', $payload);
-
-            if ($response->failed()) {
-                Log::warning('OpenAI request failed', [
-                    'product_ai_job_id' => $jobRecord->id,
-                    'product_id' => $product->id,
-                    'template_id' => $template->id,
-                    'template_slug' => $template->slug,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-
-                throw new RuntimeException('Failed to generate content (status '.$response->status().').');
-            }
-
-            $data = $response->json();
-            $content = trim((string) Arr::get($data, 'choices.0.message.content', ''));
-
-            if ($content === '') {
-                Log::warning('OpenAI response missing content', [
-                    'product_ai_job_id' => $jobRecord->id,
-                    'product_id' => $product->id,
-                    'template_id' => $template->id,
-                    'template_slug' => $template->slug,
-                    'response' => $data,
-                ]);
-
-                throw new RuntimeException('Received empty content from OpenAI.');
-            }
-
-            $jobRecord->forceFill([
-                'progress' => 80,
-            ])->save();
-
-            $contentPayload = ProductAiContentParser::normalize($template->contentType(), $content);
-
-            $record = ProductAiGeneration::create([
-                'team_id' => $product->team_id,
-                'product_id' => $product->id,
-                'product_ai_template_id' => $template->id,
-                'product_ai_job_id' => $jobRecord->id,
-                'sku' => $product->sku,
-                'content' => $contentPayload,
-                'meta' => [
-                    'model' => $payload['model'],
-                    'template_slug' => $template->slug,
-                    'job_id' => $jobRecord->id,
-                ],
+                'model' => $model,
             ]);
 
-            $this->trimHistory($template, $product->id, max($template->historyLimit(), 1));
+            try {
+                $response = LaravelOpenRouter::chatRequest(new ChatData(...$chatDataPayload));
+            } catch (GuzzleException $exception) {
+                $errorMessage = 'Failed to generate content from the AI provider.';
+                $status = null;
 
-            $meta = $jobRecord->meta ?? [];
-            $meta['generation_id'] = $record->id;
+                if (method_exists($exception, 'getResponse')) {
+                $status = $exception->getResponse()?->getStatusCode();
 
-            $jobRecord->forceFill([
-                'status' => ProductAiJob::STATUS_COMPLETED,
-                'progress' => 100,
-                'finished_at' => now(),
-                'meta' => $meta,
-            ])->save();
+                $errorMessage = match ($status) {
+                    400 => 'The AI provider rejected the request. Check the template parameters and try again.',
+                    401 => 'AI credentials are invalid or expired. Update the API key and retry.',
+                    402 => 'Out of credits or the request needs fewer max tokens.',
+                    403 => 'Provider flagged the request for moderation. Review the input content.',
+                    408 => 'Provider timed out before the model could respond.',
+                    429 => 'Provider rate limit was hit; wait a moment and try again.',
+                    502 => 'The selected AI model is currently unavailable. Try again shortly.',
+                    503 => 'No AI provider is available for the selected model at the moment.',
+                    default => $errorMessage,
+                };
+            }
+
+            Log::warning('AI provider request failed', [
+                'product_ai_job_id' => $jobRecord->id,
+                'product_id' => $product->id,
+                'template_id' => $template->id,
+                'template_slug' => $template->slug,
+                'status' => $status,
+                'exception' => $exception->getMessage(),
+                'provider' => 'openrouter',
+            ]);
+
+            throw new RuntimeException($errorMessage, previous: $exception);
+        }
+
+        $data = $response->toArray();
+        $finishReason = Str::lower((string) Arr::get($data, 'choices.0.finish_reason', ''));
+        $nativeFinishReason = Str::lower((string) Arr::get($data, 'choices.0.native_finish_reason', ''));
+
+        if (in_array($finishReason, ['length', 'max_tokens'], true) ||
+            in_array($nativeFinishReason, ['max_output_tokens', 'length'], true)) {
+            Log::warning('AI provider response hit token limit', [
+                'product_ai_job_id' => $jobRecord->id,
+                'product_id' => $product->id,
+                'template_id' => $template->id,
+                'template_slug' => $template->slug,
+                'response' => $data,
+            ]);
+
+            throw new RuntimeException('AI response exceeded the configured token limit.');
+        }
+
+        $rawContent = Arr::get($data, 'choices.0.message.content');
+        $content = $this->normalizeMessageContent($rawContent);
+
+        if ($content === '') {
+            Log::warning('AI provider response missing content', [
+                'product_ai_job_id' => $jobRecord->id,
+                'product_id' => $product->id,
+                'template_id' => $template->id,
+                'template_slug' => $template->slug,
+                'response' => $data,
+            ]);
+
+            throw new RuntimeException('Received empty content from the AI provider.');
+        }
+
+        $jobRecord->forceFill([
+            'progress' => 80,
+        ])->save();
+
+        $contentPayload = ProductAiContentParser::normalize($template->contentType(), $content);
+
+        $record = ProductAiGeneration::create([
+            'team_id' => $product->team_id,
+            'product_id' => $product->id,
+            'product_ai_template_id' => $template->id,
+            'product_ai_job_id' => $jobRecord->id,
+            'sku' => $product->sku,
+            'content' => $contentPayload,
+            'meta' => [
+                'model' => $model,
+                'template_slug' => $template->slug,
+                'job_id' => $jobRecord->id,
+            ],
+        ]);
+
+        $this->trimHistory($template, $product->id, max($template->historyLimit(), 1));
+
+        $meta = $jobRecord->meta ?? [];
+        $meta['generation_id'] = $record->id;
+
+        $jobRecord->forceFill([
+            'status' => ProductAiJob::STATUS_COMPLETED,
+            'progress' => 100,
+            'finished_at' => now(),
+            'meta' => $meta,
+        ])->save();
         } catch (Throwable $e) {
             $jobRecord->forceFill([
                 'status' => ProductAiJob::STATUS_FAILED,
@@ -342,5 +375,39 @@ class RunProductAiTemplateJob implements ShouldQueue
     protected function cleanSingleLine(string $value): string
     {
         return trim(preg_replace("/\s+/", ' ', strip_tags($value)));
+    }
+
+    /**
+     * @param  mixed  $content
+     */
+    protected function normalizeMessageContent(mixed $content): string
+    {
+        if (is_string($content)) {
+            return trim($content);
+        }
+
+        if (! is_array($content)) {
+            return '';
+        }
+
+        $segments = collect($content)->map(function ($segment) {
+            if (is_string($segment)) {
+                return $segment;
+            }
+
+            if (is_array($segment)) {
+                if (array_key_exists('text', $segment)) {
+                    return (string) $segment['text'];
+                }
+
+                if (array_key_exists('content', $segment)) {
+                    return (string) $segment['content'];
+                }
+            }
+
+            return '';
+        })->filter()->implode('');
+
+        return trim($segments);
     }
 }

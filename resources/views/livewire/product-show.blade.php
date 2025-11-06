@@ -112,7 +112,7 @@
                         </dl>
 
                         <div>
-                            <h3 class="text-sm font-medium text-gray-900">Description</h3>
+                            <h3 class="text-sm font-medium text-gray-900">Original description</h3>
                             <p class="mt-2 text-gray-700">
                                 {{ $product->description ?: 'No description provided.' }}
                             </p>
@@ -198,7 +198,7 @@
                                         </div>
 
                                         <div class="space-y-3">
-                                            <h4 class="text-sm font-semibold text-gray-900">Latest</h4>
+                                            <h4 class="text-sm font-semibold text-gray-900">Published</h4>
                                             @switch($contentType)
                                                 @case('usps')
                                                     @php
@@ -348,8 +348,8 @@
                                                                     wire:target="promoteGeneration"
                                                                     class="inline-flex items-center gap-1 border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-500 transition hover:border-gray-300 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-200 disabled:opacity-50"
                                                                 >
-                                                                    <span wire:loading.remove wire:target="promoteGeneration">Promote</span>
-                                                                    <span wire:loading wire:target="promoteGeneration">Promoting…</span>
+                                                                    <span wire:loading.remove wire:target="promoteGeneration">Publish</span>
+                                                                    <span wire:loading wire:target="promoteGeneration">Publising…</span>
                                                                 </button>
                                                             </div>
                                                             <div class="space-y-2">

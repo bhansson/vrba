@@ -20,7 +20,7 @@ class BulkProductGenerationTest extends TestCase
 
     public function test_bulk_generate_queues_jobs_for_selected_products(): void
     {
-        config()->set('services.openai.api_key', 'fake-key');
+        config()->set('laravel-openrouter.api_key', 'fake-key');
 
         Queue::fake();
 
@@ -73,7 +73,7 @@ class BulkProductGenerationTest extends TestCase
 
     public function test_bulk_generate_skips_products_without_skus(): void
     {
-        config()->set('services.openai.api_key', 'fake-key');
+        config()->set('laravel-openrouter.api_key', 'fake-key');
 
         Queue::fake();
 

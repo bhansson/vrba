@@ -66,6 +66,11 @@ class ProductAiJob extends Model
             Str::contains($error, ['timeout', 'timed out']) => 'The job timed out before the AI responded.',
             Str::contains($error, ['rate limit', 'too many requests', '429']) => 'We hit the AI rate limit; wait a moment and try again.',
             Str::contains($error, ['unauthorized', '401', 'invalid api key']) => 'We could not reach the AI service with the current credentials.',
+            Str::contains($error, ['payment required', '402', 'insufficient', 'credits']) => 'The AI service ran out of credits or the request needs fewer tokens.',
+            Str::contains($error, ['400', 'bad request', 'invalid parameter', 'rejected the request']) => 'The AI request parameters were invalid. Refresh and try again.',
+            Str::contains($error, ['403', 'flagged', 'moderation']) => 'The AI provider flagged the content for moderation.',
+            Str::contains($error, ['502', 'model could not be reached']) => 'The selected AI model is temporarily unavailable.',
+            Str::contains($error, ['503', 'no available provider']) => 'No AI provider is currently available for the selected model.',
             default => 'Something went wrong while generating the content. Please try again.',
         };
     }

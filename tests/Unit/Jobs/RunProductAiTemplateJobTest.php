@@ -10,7 +10,8 @@ use App\Models\ProductAiTemplate;
 use App\Models\ProductFeed;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
+use MoeMizrak\LaravelOpenrouter\DTO\ResponseData;
+use MoeMizrak\LaravelOpenrouter\Facades\LaravelOpenRouter;
 use Tests\TestCase;
 
 class RunProductAiTemplateJobTest extends TestCase
@@ -19,7 +20,8 @@ class RunProductAiTemplateJobTest extends TestCase
 
     public function test_job_creates_summary_record_and_trims_history(): void
     {
-        config()->set('services.openai.api_key', 'test-key');
+        config()->set('laravel-openrouter.api_key', 'test-key');
+        config()->set('services.openrouter.model', 'test-model');
 
         ProductAiTemplate::syncDefaultTemplates();
 
@@ -56,13 +58,19 @@ class RunProductAiTemplateJobTest extends TestCase
             ])->save();
         }
 
-        Http::fake([
-            '*/chat/completions' => Http::response([
+        LaravelOpenRouter::shouldReceive('chatRequest')
+            ->once()
+            ->andReturn(ResponseData::from([
+                'id' => 'test-generation',
+                'model' => 'test-model',
+                'object' => 'chat.completion',
+                'created' => now()->timestamp,
                 'choices' => [
-                    ['message' => ['content' => 'Newly generated summary.']],
+                    ['message' => ['content' => [
+                        ['type' => 'text', 'text' => 'Newly generated summary.'],
+                    ]]],
                 ],
-            ], 200),
-        ]);
+            ]));
 
         $jobRecord = ProductAiJob::create([
             'team_id' => $team->id,

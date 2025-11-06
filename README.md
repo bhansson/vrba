@@ -47,8 +47,8 @@ docker compose exec vite npm run build
 
 ## Product Browser & AI Summaries
 - Navigate to `/products` to browse all imported products for the current team. Each row expands to show full product details.
-- Click “Generate” beside a product to queue a short marketing snippet generation using OpenAI (defaults to model `gpt-5`). Track progress under **AI Jobs** (navigation) while Horizon works the queue.
-- Configure your API key in `.env` (`OPENAI_API_KEY`, optional `OPENAI_MODEL`, `OPENAI_BASE_URL`). Without a key the button will show an error when you attempt to enqueue a job.
+- Click “Generate” beside a product to queue a short marketing snippet generation using OpenRouter (defaults to `config('services.openrouter.model')`). Track progress under **AI Jobs** (navigation) while Horizon works the queue.
+- Configure your API key in `.env` (`OPENROUTER_API_KEY`, optional `OPENROUTER_MODEL`, `OPENROUTER_API_ENDPOINT`, `OPENROUTER_API_TITLE`, `OPENROUTER_API_REFERER`, `OPENROUTER_API_TIMEOUT`). Without a key the button will show an error when you attempt to enqueue a job.
 
 ## Supabase Database (Self-Hosted)
 - A local Supabase Postgres instance is bundled as `supabase-db` in `docker-compose.yml`. Start it with `docker compose up supabase-db -d`. Default credentials live in `.env` (`SUPABASE_DB_USER=postgres`, `SUPABASE_DB_PASSWORD=supabase`).
@@ -63,7 +63,7 @@ docker compose exec vite npm run build
 - Node.js is bundled in the PHP image, so Octane file watching runs by default; switch it off with `OCTANE_WATCH=false` if you want a quieter container.
 - The PHP image extends `php:8.3-cli`, enabling Swoole, Redis, SQLite, MySQL, and PostgreSQL extensions. Tune PHP settings in `.docker/octane/php.ini`.
 - Automated tests now run against the `supabase-db` Postgres container (see `.env.testing`); ensure the service is up before running `php artisan test`.
-- OpenAI access is optional; set `OPENAI_API_KEY` and related env vars when you want to enable product summaries.
+- OpenRouter access is optional; set `OPENROUTER_API_KEY` and related env vars when you want to enable product summaries.
 
 ## Stopping & Cleanup
 - Stop services without removing containers: `docker compose stop`

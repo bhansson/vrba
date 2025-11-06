@@ -91,8 +91,8 @@ class ProductsIndex extends Component
                 return;
             }
 
-            if (! config('services.openai.api_key')) {
-                $this->bulkErrorMessage = 'OpenAI API key is not configured, unable to queue AI jobs.';
+            if (! config('laravel-openrouter.api_key')) {
+                $this->bulkErrorMessage = 'AI provider API key is not configured, unable to queue AI jobs.';
                 return;
             }
 
@@ -331,8 +331,8 @@ class ProductsIndex extends Component
                 ->unique()
                 ->values();
 
-            if (! config('services.openai.api_key')) {
-                throw new \RuntimeException('OpenAI API key is not configured.');
+            if (! config('laravel-openrouter.api_key')) {
+                throw new \RuntimeException('AI provider API key is not configured.');
             }
 
             if (! $product->sku) {

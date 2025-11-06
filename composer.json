@@ -13,7 +13,8 @@
         "laravel/octane": "^2.13",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
-        "livewire/livewire": "^3.6.4"
+        "livewire/livewire": "^3.6.4",
+        "moe-mizrak/laravel-openrouter": "^2.3"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

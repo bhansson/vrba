@@ -20,7 +20,7 @@ class ProductSummaryQueueTest extends TestCase
 
     public function test_summarize_product_dispatches_ai_job(): void
     {
-        config()->set('services.openai.api_key', 'test-key');
+        config()->set('laravel-openrouter.api_key', 'test-key');
 
         Queue::fake();
 

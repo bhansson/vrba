@@ -5,7 +5,9 @@ use App\Models\ProductAiTemplate;
 return [
     'defaults' => [
         'history_limit' => 10,
-        'options' => [],
+        'options' => [
+            'max_tokens' => 1600,
+        ],
         'description_excerpt_limit' => 600,
     ],
 
@@ -34,12 +36,6 @@ return [
         'sku' => [
             'label' => 'SKU',
             'attribute' => 'sku',
-            'default' => 'N/A',
-            'clean' => 'single_line',
-        ],
-        'gtin' => [
-            'label' => 'GTIN',
-            'attribute' => 'gtin',
             'default' => 'N/A',
             'clean' => 'single_line',
         ],
@@ -75,12 +71,10 @@ return [
 Create a concise, high-converting marketing summary (maximum 60 words) for the product below. Highlight what makes it stand out and keep the tone upbeat yet trustworthy.
 
 Title: {{ title }}
-GTIN: {{ gtin }}
 Product description: {{ description }}
 PROMPT,
             'context' => [
                 ['key' => 'title'],
-                ['key' => 'gtin'],
                 ['key' => 'description'],
             ],
             'settings' => [
@@ -97,12 +91,10 @@ PROMPT,
 Write a compelling product description between 100 and 500 words based on the details below. Focus on benefits and address likely objections.
 
 Title: {{ title }}
-GTIN: {{ gtin }}
 Product description: {{ description }}
 PROMPT,
             'context' => [
                 ['key' => 'title'],
-                ['key' => 'gtin'],
                 ['key' => 'description'],
             ],
             'settings' => [
@@ -119,12 +111,10 @@ PROMPT,
 List a minimum of 3 and maximum 6 concise unique selling points for the product below. Each USP must be fewer than 20 words and avoid generic phrases.
 
 Title: {{ title }}
-GTIN: {{ gtin }}
 Product description: {{ description }}
 PROMPT,
             'context' => [
                 ['key' => 'title'],
-                ['key' => 'gtin'],
                 ['key' => 'description'],
             ],
             'settings' => [
@@ -141,12 +131,10 @@ PROMPT,
 Create exactly three customer-facing FAQ entries for the product below. For each entry provide a concise question and a two sentence answer.
 
 Title: {{ title }}
-GTIN: {{ gtin }}
 Product description: {{ description }}
 PROMPT,
             'context' => [
                 ['key' => 'title'],
-                ['key' => 'gtin'],
                 ['key' => 'description'],
             ],
             'settings' => [

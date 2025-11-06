@@ -55,8 +55,8 @@ class ProductShow extends Component
         $this->generationLoading[$key] = true;
 
         try {
-            if (! config('services.openai.api_key')) {
-                throw new \RuntimeException('OpenAI API key is not configured.');
+            if (! config('laravel-openrouter.api_key')) {
+                throw new \RuntimeException('AI provider API key is not configured.');
             }
 
             if (! $product->sku) {
@@ -128,7 +128,7 @@ class ProductShow extends Component
                 $this->generationContent[$key] = $generation->content;
             }
 
-            $this->generationStatus[$key] = 'Promoted '.$generation->template->name.' to latest.';
+            $this->generationStatus[$key] = 'Published '.$generation->template->name.' to latest.';
 
             $this->dispatch('$refresh')->self();
         } catch (\Throwable $e) {
