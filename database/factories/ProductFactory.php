@@ -40,6 +40,8 @@ class ProductFactory extends Factory
             'brand' => fake()->optional()->company(),
             'description' => fake()->paragraph(),
             'url' => fake()->url(),
+            'image_link' => fake()->optional()->imageUrl(),
+            'additional_image_link' => fake()->optional()->imageUrl(),
         ];
     }
 }

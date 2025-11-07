@@ -40,6 +40,8 @@ class ManageProductFeeds extends Component
         'brand' => '',
         'description' => '',
         'url' => '',
+        'image_link' => '',
+        'additional_image_link' => '',
     ];
 
     public bool $showMapping = false;
@@ -123,6 +125,8 @@ class ManageProductFeeds extends Component
                 'brand' => '',
                 'description' => '',
                 'url' => '',
+                'image_link' => '',
+                'additional_image_link' => '',
             ], Arr::only($feed->field_mappings ?? [], [
                 'sku',
                 'gtin',
@@ -130,6 +134,8 @@ class ManageProductFeeds extends Component
                 'brand',
                 'description',
                 'url',
+                'image_link',
+                'additional_image_link',
             ]));
 
             foreach (['sku', 'title', 'url'] as $required) {
@@ -147,6 +153,8 @@ class ManageProductFeeds extends Component
                         'brand',
                         'description',
                         'url',
+                        'image_link',
+                        'additional_image_link',
                     ]),
                 ])->save();
 
@@ -176,6 +184,8 @@ class ManageProductFeeds extends Component
                             'brand' => $this->maybeValue($type, $namespaces, $item, 'brand', $mapping),
                             'description' => $this->maybeValue($type, $namespaces, $item, 'description', $mapping),
                             'url' => $link,
+                            'image_link' => $this->maybeValue($type, $namespaces, $item, 'image_link', $mapping),
+                            'additional_image_link' => $this->maybeValue($type, $namespaces, $item, 'additional_image_link', $mapping),
                             'created_at' => now(),
                             'updated_at' => now(),
                         ];
@@ -339,6 +349,8 @@ class ManageProductFeeds extends Component
                             'brand' => $this->maybeValue($parsed['type'], $parsed['namespaces'], $item, 'brand'),
                             'description' => $this->maybeValue($parsed['type'], $parsed['namespaces'], $item, 'description'),
                             'url' => $link,
+                            'image_link' => $this->maybeValue($parsed['type'], $parsed['namespaces'], $item, 'image_link'),
+                            'additional_image_link' => $this->maybeValue($parsed['type'], $parsed['namespaces'], $item, 'additional_image_link'),
                             'created_at' => now(),
                             'updated_at' => now(),
                         ];
@@ -787,6 +799,8 @@ class ManageProductFeeds extends Component
         $this->mapping['brand'] = $this->pickField($fieldSet, ['g:brand', 'brand', 'g:manufacturer', 'manufacturer']);
         $this->mapping['description'] = $this->pickField($fieldSet, ['g:description', 'description']);
         $this->mapping['url'] = $this->pickField($fieldSet, ['g:link', 'link', 'url']);
+        $this->mapping['image_link'] = $this->pickField($fieldSet, ['g:image_link', 'image_link', 'image']);
+        $this->mapping['additional_image_link'] = $this->pickField($fieldSet, ['g:additional_image_link', 'additional_image_link']);
     }
 
     protected function pickField(Collection $fields, array $options): string

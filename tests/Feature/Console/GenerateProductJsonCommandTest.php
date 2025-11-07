@@ -46,6 +46,8 @@ class GenerateProductJsonCommandTest extends TestCase
             ->create([
                 'sku' => 'SKU-123',
                 'brand' => 'Test Brand',
+                'image_link' => 'https://example.com/primary.jpg',
+                'additional_image_link' => 'https://example.com/alt.jpg',
             ]);
 
         $summaryTemplate = ProductAiTemplate::where('slug', ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY)->firstOrFail();
@@ -110,6 +112,8 @@ class GenerateProductJsonCommandTest extends TestCase
         $this->assertSame($product->sku, $payload['sku']);
         $this->assertSame($team->public_hash, $payload['team_hash']);
         $this->assertSame('sv', $payload['language']);
+        $this->assertSame('https://example.com/primary.jpg', $payload['image_link']);
+        $this->assertSame('https://example.com/alt.jpg', $payload['additional_image_link']);
         $this->assertSame($summary->content, $payload['ai']['description_summary']['content']);
         $this->assertArrayNotHasKey('meta', $payload['ai']['description_summary']);
         $this->assertSame(

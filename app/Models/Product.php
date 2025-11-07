@@ -20,6 +20,8 @@ class Product extends Model
         'brand',
         'description',
         'url',
+        'image_link',
+        'additional_image_link',
     ];
 
     public function feed()

@@ -156,6 +156,8 @@ class GenerateProductJsonCommand extends Command
             'title' => $product->title,
             'description' => $product->description,
             'url' => $product->url,
+            'image_link' => $product->image_link,
+            'additional_image_link' => $product->additional_image_link,
             'language' => optional($product->feed)->language,
             'created_at' => optional($product->created_at)->toIso8601String(),
             'updated_at' => optional($product->updated_at)->toIso8601String(),

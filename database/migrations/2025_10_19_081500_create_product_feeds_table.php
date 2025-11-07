@@ -36,6 +36,8 @@ return new class extends Migration
             $table->string('brand');
             $table->text('description')->nullable();
             $table->string('url', 2048);
+            $table->string('image_link', 2048)->nullable();
+            $table->text('additional_image_link')->nullable();
             $table->timestamps();
 
             $table->unique(['team_id', 'sku', 'product_feed_id']);

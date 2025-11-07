@@ -22,63 +22,78 @@
 <div>
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <div class="bg-white shadow-sm sm:rounded-lg">
-            <div class="px-6 py-6 space-y-4">
-                <div>
-                    <h1 class="text-2xl font-semibold text-gray-900">
-                        {{ $product->title ?: 'Untitled product' }}
-                    </h1>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-gray-500">
-                        <span>Brand: {{ $product->brand ?: '—' }}</span>
-                        <span>SKU: {{ $product->sku ?: '—' }}</span>
-                        <span>GTIN: {{ $product->gtin ?: '—' }}</span>
-                        <span>Updated {{ $product->updated_at->diffForHumans() }}</span>
-                        <span>Created {{ $product->created_at->diffForHumans() }}</span>
-                    </div>
-                </div>
+            <div class="px-6 py-6">
+                <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="flex-1 space-y-4">
+                        <div>
+                            <h1 class="text-2xl font-semibold text-gray-900">
+                                {{ $product->title ?: 'Untitled product' }}
+                            </h1>
+                            <div class="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-gray-500">
+                                <span>Brand: {{ $product->brand ?: '—' }}</span>
+                                <span>SKU: {{ $product->sku ?: '—' }}</span>
+                                <span>GTIN: {{ $product->gtin ?: '—' }}</span>
+                                <span>Updated {{ $product->updated_at->diffForHumans() }}</span>
+                                <span>Created {{ $product->created_at->diffForHumans() }}</span>
+                            </div>
+                        </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="text-sm text-gray-600 space-y-1">
-                        <div>
-                            <span class="font-medium text-gray-700">Brand:</span>
-                            <span>{{ $product->brand ?: '—' }}</span>
-                        </div>
-                        <div>
-                            <span class="font-medium text-gray-700">Feed:</span>
-                            <span>{{ $product->feed?->name ?: '—' }}</span>
-                        </div>
-                        <div>
-                            <span class="font-medium text-gray-700">Language:</span>
-                            @php
-                                $feedLanguageCode = $product->feed?->language;
-                                $feedLanguageLabel = $feedLanguageCode ? ($languageLabels[$feedLanguageCode] ?? Str::upper($feedLanguageCode)) : null;
-                            @endphp
-                            <span>{{ $feedLanguageLabel ? $feedLanguageLabel.' ('.Str::upper($feedLanguageCode).')' : '—' }}</span>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="text-sm text-gray-600 space-y-1">
+                                <div>
+                                    <span class="font-medium text-gray-700">Brand:</span>
+                                    <span>{{ $product->brand ?: '—' }}</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium text-gray-700">Feed:</span>
+                                    <span>{{ $product->feed?->name ?: '—' }}</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium text-gray-700">Language:</span>
+                                    @php
+                                        $feedLanguageCode = $product->feed?->language;
+                                        $feedLanguageLabel = $feedLanguageCode ? ($languageLabels[$feedLanguageCode] ?? Str::upper($feedLanguageCode)) : null;
+                                    @endphp
+                                    <span>{{ $feedLanguageLabel ? $feedLanguageLabel.' ('.Str::upper($feedLanguageCode).')' : '—' }}</span>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-3">
+                                @if ($product->url)
+                                    <a href="{{ $product->url }}" target="_blank" rel="noopener noreferrer"
+                                       class="inline-flex items-center px-4 py-2 border border-indigo-200 rounded-md text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:border-indigo-300">
+                                        Visit product page
+                                        <svg class="ml-2 size-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                  d="M17.25 6.75L6.75 17.25M17.25 6.75H9.75M17.25 6.75v7.5"/>
+                                        </svg>
+                                    </a>
+                                @endif
+                                @if ($product->feed?->feed_url)
+                                    <a href="{{ $product->feed->feed_url }}" target="_blank" rel="noopener noreferrer"
+                                       class="inline-flex items-center px-4 py-2 border border-gray-200 rounded-md text-sm font-medium text-gray-600 hover:text-gray-800 hover:border-gray-300">
+                                        Open feed source
+                                        <svg class="ml-2 size-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                  d="M17.25 6.75L6.75 17.25M17.25 6.75H9.75M17.25 6.75v7.5"/>
+                                        </svg>
+                                    </a>
+                                @endif
+                            </div>
                         </div>
                     </div>
-                    <div class="flex flex-wrap gap-3">
-                        @if ($product->url)
-                            <a href="{{ $product->url }}" target="_blank" rel="noopener noreferrer"
-                               class="inline-flex items-center px-4 py-2 border border-indigo-200 rounded-md text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:border-indigo-300">
-                                Visit product page
-                                <svg class="ml-2 size-4" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                     viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                          d="M17.25 6.75L6.75 17.25M17.25 6.75H9.75M17.25 6.75v7.5"/>
-                                </svg>
-                            </a>
-                        @endif
-                        @if ($product->feed?->feed_url)
-                            <a href="{{ $product->feed->feed_url }}" target="_blank" rel="noopener noreferrer"
-                               class="inline-flex items-center px-4 py-2 border border-gray-200 rounded-md text-sm font-medium text-gray-600 hover:text-gray-800 hover:border-gray-300">
-                                Open feed source
-                                <svg class="ml-2 size-4" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                     viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                          d="M17.25 6.75L6.75 17.25M17.25 6.75H9.75M17.25 6.75v7.5"/>
-                                </svg>
-                            </a>
-                        @endif
-                    </div>
+
+                    @if ($product->image_link)
+                        <div class="lg:w-56 flex justify-start lg:justify-end">
+                            <x-product-image-preview
+                                :src="$product->image_link"
+                                :alt="$product->title ? 'Preview of '.$product->title : 'Product image preview'"
+                                size="w-40 h-40 sm:w-48 sm:h-48"
+                                class="mx-auto lg:mx-0"
+                            />
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

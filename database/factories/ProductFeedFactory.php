@@ -25,6 +25,8 @@ class ProductFeedFactory extends Factory
                 'title' => 'g:title',
                 'description' => 'g:description',
                 'url' => 'g:link',
+                'image_link' => 'g:image_link',
+                'additional_image_link' => 'g:additional_image_link',
             ],
         ];
     }

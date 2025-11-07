@@ -170,25 +170,34 @@
                             />
                         </div>
                         <div class="sm:col-span-7">
-                            <div class="text-sm font-semibold text-gray-900">
-                                {{ $product->title ?: 'Untitled product' }}
-                            </div>
-                            <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-                                <span>Brand: {{ $product->brand ?: '—' }}</span>
-                                <span>SKU: {{ $product->sku ?: '—' }}</span>
-                                <span>GTIN: {{ $product->gtin ?: '—' }}</span>
-                                <span>Updated {{ $product->updated_at->diffForHumans() }}</span>
-                                @php
-                                    $productLanguageCode = $product->feed?->language;
-                                    $productLanguageLabel = $productLanguageCode ? ($languageLabels[$productLanguageCode] ?? Str::upper($productLanguageCode)) : null;
-                                @endphp
-                                <span>Language: {{ $productLanguageLabel ? $productLanguageLabel.' ('.Str::upper($productLanguageCode).')' : '—' }}</span>
-                            </div>
-                            @if ($product->feed?->name)
-                                <div class="mt-1 text-xs text-gray-500">
-                                    Feed: {{ $product->feed->name }}
+                            <div class="flex items-start gap-4">
+                                <x-product-image-preview
+                                    :src="$product->image_link"
+                                    :alt="$product->title ? 'Preview of '.$product->title : 'Product image preview'"
+                                    size="w-16 h-16"
+                                />
+                                <div class="flex-1">
+                                    <div class="text-sm font-semibold text-gray-900">
+                                        {{ $product->title ?: 'Untitled product' }}
+                                    </div>
+                                    <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                                        <span>Brand: {{ $product->brand ?: '—' }}</span>
+                                        <span>SKU: {{ $product->sku ?: '—' }}</span>
+                                        <span>GTIN: {{ $product->gtin ?: '—' }}</span>
+                                        <span>Updated {{ $product->updated_at->diffForHumans() }}</span>
+                                        @php
+                                            $productLanguageCode = $product->feed?->language;
+                                            $productLanguageLabel = $productLanguageCode ? ($languageLabels[$productLanguageCode] ?? Str::upper($productLanguageCode)) : null;
+                                        @endphp
+                                        <span>Language: {{ $productLanguageLabel ? $productLanguageLabel.' ('.Str::upper($productLanguageCode).')' : '—' }}</span>
+                                    </div>
+                                    @if ($product->feed?->name)
+                                        <div class="mt-1 text-xs text-gray-500">
+                                            Feed: {{ $product->feed->name }}
+                                        </div>
+                                    @endif
                                 </div>
-                            @endif
+                            </div>
                         </div>
                         <div class="sm:col-span-2 text-sm text-gray-700">
                             @if ($latestGenerationRecord && $latestGenerationTimestamp)
