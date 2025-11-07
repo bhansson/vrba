@@ -63,7 +63,7 @@ docker compose exec vite npm run build
 - Node.js is bundled in the PHP image, so Octane file watching runs by default; switch it off with `OCTANE_WATCH=false` if you want a quieter container.
 - The PHP image extends `php:8.3-cli`, enabling Swoole, Redis, SQLite, MySQL, and PostgreSQL extensions. Tune PHP settings in `.docker/octane/php.ini`.
 - Automated tests now run against the `supabase-db` Postgres container (see `.env.testing`); ensure the service is up before running `php artisan test`.
-- OpenRouter access is optional; set `OPENROUTER_API_KEY` and related env vars when you want to enable product summaries.
+- OpenRouter access is optional; set `OPENROUTER_API_KEY` and related env vars when you want to enable product summaries. The Photo Studio page uses `OPENROUTER_PHOTO_STUDIO_MODEL` (default `openai/gpt-4.1`) to control which multimodal model extracts prompts from product shots.
 
 ## Stopping & Cleanup
 - Stop services without removing containers: `docker compose stop`

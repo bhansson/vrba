@@ -35,4 +35,7 @@ Route::middleware([
 
     Route::view('/ai-templates', 'ai-templates.index')
         ->name('ai-templates.index');
+
+    Route::view('/photo-studio', 'photo-studio.index')
+        ->name('photo-studio.index');
 });

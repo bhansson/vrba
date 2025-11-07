@@ -24,6 +24,9 @@
                     <x-nav-link href="{{ route('ai-templates.index') }}" :active="request()->routeIs('ai-templates.index')">
                         {{ __('AI Templates') }}
                     </x-nav-link>
+                    <x-nav-link href="{{ route('photo-studio.index') }}" :active="request()->routeIs('photo-studio.index')">
+                        {{ __('Photo Studio') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -159,6 +162,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link href="{{ route('ai-templates.index') }}" :active="request()->routeIs('ai-templates.index')">
                 {{ __('AI Templates') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link href="{{ route('photo-studio.index') }}" :active="request()->routeIs('photo-studio.index')">
+                {{ __('Photo Studio') }}
             </x-responsive-nav-link>
         </div>
 

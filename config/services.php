@@ -39,4 +39,8 @@ return [
         'model' => env('OPENROUTER_MODEL', 'openrouter/auto'),
     ],
 
+    'photo_studio' => [
+        'model' => env('OPENROUTER_PHOTO_STUDIO_MODEL', 'openai/gpt-4.1'),
+    ],
+
 ];
