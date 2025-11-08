@@ -1,4 +1,21 @@
-<div class="space-y-6">
+<div
+    class="space-y-6"
+    x-data="{
+        overlayOpen: false,
+        selectedEntry: null,
+        openOverlay(entry) {
+            this.selectedEntry = entry;
+            this.overlayOpen = true;
+            document.body.classList.add('overflow-hidden');
+        },
+        closeOverlay() {
+            this.overlayOpen = false;
+            this.selectedEntry = null;
+            document.body.classList.remove('overflow-hidden');
+        },
+    }"
+    @keydown.escape.window="closeOverlay()"
+>
     @php
         $selectedProduct = collect($products)->firstWhere('id', $productId);
     @endphp
@@ -249,18 +266,18 @@
                         <div class="flex flex-col rounded-xl border border-gray-200 bg-gray-50 p-3" wire:key="gallery-{{ $entry['id'] }}">
                             @if ($entry['url'])
                                 <div class="relative group">
-                                    <a
-                                        href="{{ $entry['url'] }}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="block overflow-hidden rounded-lg"
+                                    <button
+                                        type="button"
+                                        class="block w-full overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                                        @click="openOverlay(@js($entry))"
                                     >
                                         <img
                                             src="{{ $entry['url'] }}"
                                             alt="Generated render #{{ $entry['id'] }}"
                                             class="h-48 w-full object-cover transition duration-200 hover:scale-[1.02]"
                                         />
-                                    </a>
+                                        <span class="sr-only">Open gallery details for run #{{ $entry['id'] }}</span>
+                                    </button>
                                     <a
                                         href="{{ route('photo-studio.gallery.download', $entry['id']) }}"
                                         download
@@ -291,6 +308,78 @@
                     @endforeach
                 </div>
             @endif
+        </div>
+    </div>
+
+    <div
+        x-cloak
+        x-show="overlayOpen"
+        x-transition.opacity
+        class="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 sm:px-6"
+        role="dialog"
+        aria-modal="true"
+    >
+        <div class="absolute inset-0 bg-gray-900/70" @click="closeOverlay()" aria-hidden="true"></div>
+
+        <div
+            class="relative z-10 w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            @click.stop
+        >
+            <button
+                type="button"
+                class="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow ring-1 ring-black/10 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                @click="closeOverlay()"
+            >
+                <span class="sr-only">Close gallery details</span>
+                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="m6 6 8 8m0-8-8 8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </button>
+
+            <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <div class="bg-gray-100">
+                    <img
+                        :src="selectedEntry ? selectedEntry.url : ''"
+                        :alt="selectedEntry ? `Generated render #${selectedEntry.id}` : ''"
+                        class="h-full w-full object-contain bg-gray-900/5"
+                    />
+                </div>
+                <div class="space-y-5 p-6">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Run details</p>
+                        <p class="mt-1 text-sm font-medium text-gray-900" x-text="selectedEntry ? `Run #${selectedEntry.id}` : ''"></p>
+                        <p class="text-xs text-gray-500" x-text="selectedEntry && selectedEntry.created_at_human ? selectedEntry.created_at_human : ''"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Prompt</p>
+                        <p
+                            class="mt-2 whitespace-pre-line rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800"
+                            x-text="selectedEntry && selectedEntry.prompt ? selectedEntry.prompt : 'Prompt unavailable for this render.'"
+                        ></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Model</p>
+                        <p class="mt-2 text-sm text-gray-900" x-text="selectedEntry && selectedEntry.model ? selectedEntry.model : 'Unknown model'"></p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 pt-1">
+                        <a
+                            :href="selectedEntry ? selectedEntry.url : '#'"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex items-center rounded-full border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                        >
+                            View full size
+                        </a>
+                        <a
+                            :href="selectedEntry ? selectedEntry.download_url : '#'"
+                            download
+                            class="inline-flex items-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                        >
+                            Download
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

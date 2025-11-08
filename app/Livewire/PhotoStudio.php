@@ -345,8 +345,8 @@ class PhotoStudio extends Component
         $this->isAwaitingGeneration = false;
         $this->pendingGenerationBaselineId = null;
         $this->generationStatus = $shouldConfirmGallery
-            ? 'New render added to the gallery.'
-            : 'New render finished.';
+            ? 'New image added to the gallery.'
+            : 'New image finished.';
         $this->pendingProductId = null;
 
         if ($shouldConfirmGallery) {
@@ -567,6 +567,9 @@ TEXT;
                     'url' => $this->resolveDiskUrl($generation->storage_disk, $generation->storage_path),
                     'disk' => $generation->storage_disk,
                     'path' => $generation->storage_path,
+                    'prompt' => $generation->prompt,
+                    'model' => $generation->model,
+                    'download_url' => route('photo-studio.gallery.download', $generation),
                     'created_at' => optional($generation->created_at)->toDateTimeString(),
                     'created_at_human' => optional($generation->created_at)->diffForHumans(),
                 ];
