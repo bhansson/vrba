@@ -129,6 +129,49 @@ class PhotoStudioTest extends TestCase
         });
     }
 
+    public function test_generate_image_uses_existing_generations_as_baseline(): void
+    {
+        config()->set('laravel-openrouter.api_key', 'test-key');
+        config()->set('services.photo_studio.image_model', 'google/gemini-2.5-flash-image');
+        config()->set('services.photo_studio.generation_disk', 's3');
+
+        Queue::fake();
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $feed = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+        ]);
+
+        $product = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+            ]);
+
+        $existing = PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Historic prompt',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/historic.png',
+        ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(PhotoStudio::class)
+            ->set('productId', $product->id)
+            ->set('promptResult', 'Use this prompt as-is')
+            ->call('generateImage')
+            ->assertSet('pendingGenerationBaselineId', $existing->id)
+            ->assertSet('pendingProductId', $product->id);
+    }
+
     public function test_user_can_generate_image_with_prompt_only(): void
     {
         config()->set('laravel-openrouter.api_key', 'test-key');
@@ -155,6 +198,188 @@ class PhotoStudioTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_product_gallery_scopes_to_selected_product(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $feed = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+        ]);
+
+        $productA = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+            ]);
+
+        $productB = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+            ]);
+
+        $firstGeneration = PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $productA->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Studio prompt',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/a-first.png',
+        ]);
+
+        $secondGeneration = PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $productA->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Studio prompt v2',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/a-second.png',
+        ]);
+
+        PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $productB->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Studio prompt other product',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/b-first.png',
+        ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(PhotoStudio::class)
+            ->assertSet('productGallery', [])
+            ->set('productId', $productA->id)
+            ->assertSet('productGallery.0.id', $secondGeneration->id)
+            ->assertSet('productGallery.1.id', $firstGeneration->id);
+    }
+
+    public function test_poll_generation_status_refreshes_latest_image_and_gallery(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $feed = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+        ]);
+
+        $product = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+            ]);
+
+        $this->actingAs($user);
+
+        $component = Livewire::test(PhotoStudio::class)
+            ->set('productId', $product->id);
+
+        $component
+            ->set('pendingGenerationBaselineId', 0)
+            ->set('isAwaitingGeneration', true)
+            ->set('generationStatus', 'Image generation queued. Hang tight while we render your scene.')
+            ->set('pendingProductId', $product->id);
+
+        $latest = PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Fresh prompt',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/new.png',
+            'response_id' => 'test-response',
+        ]);
+
+        $component
+            ->call('pollGenerationStatus')
+            ->assertSet('isAwaitingGeneration', false)
+            ->assertSet('pendingGenerationBaselineId', null)
+            ->assertSet('latestGeneration.path', $latest->storage_path)
+            ->assertSet('latestObservedGenerationId', $latest->id)
+            ->assertSet('productGallery.0.id', $latest->id)
+            ->assertSet('generationStatus', 'New render added to the gallery.')
+            ->assertSet('pendingProductId', null);
+    }
+
+    public function test_poll_generation_status_waits_for_matching_product_before_finishing(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $feed = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+        ]);
+
+        $productA = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+            ]);
+
+        $productB = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+            ]);
+
+        $this->actingAs($user);
+
+        $component = Livewire::test(PhotoStudio::class)
+            ->set('productId', $productA->id)
+            ->set('pendingGenerationBaselineId', 0)
+            ->set('pendingProductId', $productA->id)
+            ->set('isAwaitingGeneration', true);
+
+        PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $productB->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Other product prompt',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/b-run.png',
+        ]);
+
+        $component
+            ->call('pollGenerationStatus')
+            ->assertSet('isAwaitingGeneration', true)
+            ->assertSet('generationStatus', 'Image generation in progress…');
+
+        $matching = PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $productA->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Matching prompt',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/a-run.png',
+        ]);
+
+        $component
+            ->call('pollGenerationStatus')
+            ->assertSet('isAwaitingGeneration', false)
+            ->assertSet('generationStatus', 'New render added to the gallery.')
+            ->assertSet('productGallery.0.id', $matching->id)
+            ->assertSet('pendingProductId', null);
     }
 
     public function test_generate_photo_studio_image_job_persists_output(): void

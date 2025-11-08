@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DownloadPhotoStudioGenerationController;
 use App\Models\Product;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -38,4 +39,7 @@ Route::middleware([
 
     Route::view('/photo-studio', 'photo-studio.index')
         ->name('photo-studio.index');
+
+    Route::get('/photo-studio/gallery/{generation}/download', DownloadPhotoStudioGenerationController::class)
+        ->name('photo-studio.gallery.download');
 });

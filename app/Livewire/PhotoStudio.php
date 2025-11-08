@@ -54,6 +54,21 @@ class PhotoStudio extends Component
     public ?string $generationStatus = null;
 
     /**
+     * Gallery of previously generated images for the selected product.
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    public array $productGallery = [];
+
+    public ?int $latestObservedGenerationId = null;
+
+    public ?int $pendingGenerationBaselineId = null;
+
+    public bool $isAwaitingGeneration = false;
+
+    public ?int $pendingProductId = null;
+
+    /**
      * Light-weight product catalogue for the select element.
      *
      * @var array<int, array<string, mixed>>
@@ -86,6 +101,7 @@ class PhotoStudio extends Component
 
         $this->syncSelectedProductPreview();
         $this->refreshLatestGeneration();
+        $this->refreshProductGallery();
     }
 
     /**
@@ -109,6 +125,7 @@ class PhotoStudio extends Component
         $this->promptResult = null;
         $this->resetGenerationPreview();
         $this->syncSelectedProductPreview();
+        $this->refreshProductGallery();
     }
 
     /**
@@ -120,6 +137,7 @@ class PhotoStudio extends Component
         $this->promptResult = null;
         $this->resetGenerationPreview();
         $this->productImagePreview = null;
+        $this->refreshProductGallery();
     }
 
     public function extractPrompt(): void
@@ -198,7 +216,7 @@ class PhotoStudio extends Component
         }
 
         if (! $this->promptResult) {
-            $this->errorMessage = 'Extract a prompt before generating an image.';
+            $this->errorMessage = 'Prompt is missing.';
 
             return;
         }
@@ -221,6 +239,11 @@ class PhotoStudio extends Component
         }
 
         try {
+            $previousGenerationId = PhotoStudioGeneration::query()
+                ->where('team_id', $team->id)
+                ->where('product_id', $this->productId)
+                ->max('id');
+
             $imageInput = null;
             $product = null;
             $sourceType = 'prompt_only';
@@ -250,8 +273,10 @@ class PhotoStudio extends Component
                 sourceReference: $sourceReference,
             );
 
-            $this->generationStatus = 'Image generation queued. The preview will appear once it finishes.';
-            $this->refreshLatestGeneration();
+            $this->pendingGenerationBaselineId = $previousGenerationId ?? 0;
+            $this->isAwaitingGeneration = true;
+            $this->pendingProductId = $product?->id;
+            $this->generationStatus = 'Image generation queued. Hang tight while we render your scene.';
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
@@ -262,6 +287,70 @@ class PhotoStudio extends Component
             ]);
 
             $this->errorMessage = 'Unable to generate an image right now. Please try again in a moment.';
+        }
+    }
+
+    public function pollGenerationStatus(): void
+    {
+        if (! $this->isAwaitingGeneration) {
+            return;
+        }
+
+        $teamId = Auth::user()?->currentTeam?->id;
+
+        if (! $teamId) {
+            $this->isAwaitingGeneration = false;
+
+            return;
+        }
+
+        $baseline = $this->pendingGenerationBaselineId ?? 0;
+
+        $latest = PhotoStudioGeneration::query()
+            ->where('team_id', $teamId)
+            ->where('id', '>', $baseline)
+            ->when(
+                $this->pendingProductId === null,
+                static function ($query): void {
+                    $query->whereNull('product_id');
+                },
+                function ($query): void {
+                    $query->where('product_id', $this->pendingProductId);
+                }
+            )
+            ->latest()
+            ->first();
+
+        if (! $latest) {
+            $this->generationStatus = 'Image generation in progress…';
+
+            return;
+        }
+
+        $shouldConfirmGallery = $this->pendingProductId !== null && $this->pendingProductId === $this->productId;
+
+        if ($shouldConfirmGallery) {
+            $this->refreshProductGallery();
+            $latestGalleryId = $this->productGallery[0]['id'] ?? null;
+
+            if ($latestGalleryId !== $latest->id) {
+                $this->generationStatus = 'Image generation in progress…';
+
+                return;
+            }
+        }
+
+        $this->refreshLatestGeneration();
+
+        $this->isAwaitingGeneration = false;
+        $this->pendingGenerationBaselineId = null;
+        $this->generationStatus = $shouldConfirmGallery
+            ? 'New render added to the gallery.'
+            : 'New render finished.';
+        $this->pendingProductId = null;
+
+        if ($shouldConfirmGallery) {
+            $this->refreshProductGallery();
         }
     }
 
@@ -413,6 +502,11 @@ TEXT;
     {
         $this->generatedImageUrl = null;
         $this->latestGeneration = null;
+        $this->latestObservedGenerationId = null;
+        $this->isAwaitingGeneration = false;
+        $this->pendingGenerationBaselineId = null;
+        $this->generationStatus = null;
+        $this->pendingProductId = null;
     }
 
     private function refreshLatestGeneration(): void
@@ -443,6 +537,41 @@ TEXT;
         ];
 
         $this->generatedImageUrl = $this->resolveDiskUrl($latest->storage_disk, $latest->storage_path);
+        $this->latestObservedGenerationId = $latest->id;
+    }
+
+    private function refreshProductGallery(): void
+    {
+        $this->productGallery = [];
+
+        if (! $this->productId) {
+            return;
+        }
+
+        $teamId = Auth::user()?->currentTeam?->id;
+
+        if (! $teamId) {
+            return;
+        }
+
+        $generations = PhotoStudioGeneration::query()
+            ->where('team_id', $teamId)
+            ->where('product_id', $this->productId)
+            ->latest()
+            ->get();
+
+        $this->productGallery = $generations
+            ->map(function (PhotoStudioGeneration $generation): array {
+                return [
+                    'id' => $generation->id,
+                    'url' => $this->resolveDiskUrl($generation->storage_disk, $generation->storage_path),
+                    'disk' => $generation->storage_disk,
+                    'path' => $generation->storage_path,
+                    'created_at' => optional($generation->created_at)->toDateTimeString(),
+                    'created_at_human' => optional($generation->created_at)->diffForHumans(),
+                ];
+            })
+            ->toArray();
     }
 
     private function extractResponseContent(array $response): string
