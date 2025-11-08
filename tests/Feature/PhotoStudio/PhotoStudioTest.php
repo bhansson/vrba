@@ -312,7 +312,7 @@ class PhotoStudioTest extends TestCase
             ->assertSet('latestGeneration.path', $latest->storage_path)
             ->assertSet('latestObservedGenerationId', $latest->id)
             ->assertSet('productGallery.0.id', $latest->id)
-            ->assertSet('generationStatus', 'New render added to the gallery.')
+            ->assertSet('generationStatus', 'New image added to the gallery.')
             ->assertSet('pendingProductId', null);
     }
 
@@ -377,9 +377,51 @@ class PhotoStudioTest extends TestCase
         $component
             ->call('pollGenerationStatus')
             ->assertSet('isAwaitingGeneration', false)
-            ->assertSet('generationStatus', 'New render added to the gallery.')
+            ->assertSet('generationStatus', 'New image added to the gallery.')
             ->assertSet('productGallery.0.id', $matching->id)
             ->assertSet('pendingProductId', null);
+    }
+
+    public function test_user_can_soft_delete_generation_from_gallery(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $feed = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+        ]);
+
+        $product = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+            ]);
+
+        $generation = PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Prompt to delete',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/delete-me.png',
+        ]);
+
+        $this->actingAs($user);
+
+        $component = Livewire::test(PhotoStudio::class)
+            ->set('productId', $product->id)
+            ->assertSet('productGallery.0.id', $generation->id);
+
+        $component
+            ->call('deleteGeneration', $generation->id)
+            ->assertSet('productGallery', []);
+
+        $this->assertSoftDeleted('photo_studio_generations', [
+            'id' => $generation->id,
+        ]);
     }
 
     public function test_generate_photo_studio_image_job_persists_output(): void

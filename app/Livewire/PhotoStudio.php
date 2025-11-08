@@ -354,6 +354,36 @@ class PhotoStudio extends Component
         }
     }
 
+    public function deleteGeneration(int $generationId): void
+    {
+        $team = Auth::user()?->currentTeam;
+
+        if (! $team) {
+            abort(403, 'Join or create a team to access the Photo Studio.');
+        }
+
+        if (! $this->productId) {
+            return;
+        }
+
+        $generation = PhotoStudioGeneration::query()
+            ->where('team_id', $team->id)
+            ->where('product_id', $this->productId)
+            ->find($generationId);
+
+        if (! $generation) {
+            return;
+        }
+
+        $generation->delete();
+
+        if ($this->latestObservedGenerationId === $generationId) {
+            $this->refreshLatestGeneration();
+        }
+
+        $this->refreshProductGallery();
+    }
+
     public function render(): View
     {
         return view('livewire.photo-studio');

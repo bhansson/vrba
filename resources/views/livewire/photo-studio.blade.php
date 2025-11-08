@@ -273,10 +273,10 @@
                                     >
                                         <img
                                             src="{{ $entry['url'] }}"
-                                            alt="Generated render #{{ $entry['id'] }}"
+                                            alt="Generated render"
                                             class="h-48 w-full object-cover transition duration-200 hover:scale-[1.02]"
                                         />
-                                        <span class="sr-only">Open gallery details for run #{{ $entry['id'] }}</span>
+                                        <span class="sr-only">Open gallery details for this image</span>
                                     </button>
                                     <a
                                         href="{{ route('photo-studio.gallery.download', $entry['id']) }}"
@@ -298,8 +298,7 @@
                                     </div>
                                 </div>
                             @endif
-                            <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
-                                <span>Run #{{ $entry['id'] }}</span>
+                            <div class="mt-3 flex items-center justify-end text-xs text-gray-500">
                                 @if (! empty($entry['created_at_human']))
                                     <span>{{ $entry['created_at_human'] }}</span>
                                 @endif
@@ -340,15 +339,15 @@
                 <div class="bg-gray-100">
                     <img
                         :src="selectedEntry ? selectedEntry.url : ''"
-                        :alt="selectedEntry ? `Generated render #${selectedEntry.id}` : ''"
+                        :alt="selectedEntry ? 'Generated render' : ''"
                         class="h-full w-full object-contain bg-gray-900/5"
                     />
                 </div>
                 <div class="space-y-5 p-6">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Run details</p>
-                        <p class="mt-1 text-sm font-medium text-gray-900" x-text="selectedEntry ? `Run #${selectedEntry.id}` : ''"></p>
-                        <p class="text-xs text-gray-500" x-text="selectedEntry && selectedEntry.created_at_human ? selectedEntry.created_at_human : ''"></p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Image details</p>
+                        <p class="mt-1 text-sm font-medium text-gray-900" x-text="selectedEntry && selectedEntry.created_at_human ? `Added ${selectedEntry.created_at_human}` : ''"></p>
+                        <p class="text-xs text-gray-500" x-text="selectedEntry && selectedEntry.created_at ? selectedEntry.created_at : ''"></p>
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Prompt</p>
@@ -377,6 +376,24 @@
                         >
                             Download
                         </a>
+                        <button
+                            type="button"
+                            class="inline-flex items-center rounded-full border border-red-200 px-4 py-2 text-sm font-medium text-red-600 shadow-sm transition hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:opacity-60"
+                            wire:loading.attr="disabled"
+                            wire:target="deleteGeneration"
+                            x-on:click.prevent="if (!selectedEntry) { return; } if (!confirm('Delete this image from the gallery?')) { return; } $wire.deleteGeneration(selectedEntry.id).then(() => { closeOverlay(); });"
+                        >
+                            <span class="flex items-center gap-2" wire:loading.remove wire:target="deleteGeneration">
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                    <path d="m7 5 .867-1.3A1 1 0 0 1 8.7 3h2.6a1 1 0 0 1 .833.7L13 5m4 0H3m1 0 .588 11.18A1 1 0 0 0 5.587 17h8.826a1 1 0 0 0 .999-.82L16 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                                <span>Delete image</span>
+                            </span>
+                            <span class="flex items-center gap-2" wire:loading.flex wire:target="deleteGeneration">
+                                <x-loading-spinner class="size-4" />
+                                <span>Deleting…</span>
+                            </span>
+                        </button>
                     </div>
                 </div>
             </div>

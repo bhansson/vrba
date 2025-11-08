@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('response_model', 191)->nullable();
             $table->json('response_metadata')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index(['team_id', 'created_at']);
         });
