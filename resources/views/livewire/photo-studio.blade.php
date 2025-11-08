@@ -353,7 +353,7 @@
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Prompt</p>
                         <p
-                            class="mt-2 whitespace-pre-line rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800"
+                            class="mt-2 max-h-48 whitespace-pre-line overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800"
                             x-text="selectedEntry && selectedEntry.prompt ? selectedEntry.prompt : 'Prompt unavailable for this render.'"
                         ></p>
                     </div>
