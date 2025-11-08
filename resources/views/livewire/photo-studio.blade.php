@@ -124,38 +124,56 @@
                 </div>
             @endif
 
-            <div class="flex flex-wrap items-center gap-4">
-                <x-button
-                    type="button"
-                    wire:click="extractPrompt"
-                    wire:loading.attr="disabled"
-                    class="flex items-center gap-2"
-                >
-                    <span wire:loading.remove wire:target="extractPrompt,productId,image">
-                        Extract prompt
-                    </span>
-                    <span wire:loading.flex wire:target="extractPrompt" class="flex items-center gap-2">
-                        <x-loading-spinner class="size-4" />
-                        Processing…
-                    </span>
-                </x-button>
-            </div>
+            @if ($generationStatus)
+                <div class="rounded-md bg-indigo-50 p-4 text-sm text-indigo-800">
+                    {{ $generationStatus }}
+                </div>
+            @endif
+
+            <x-button
+                type="button"
+                wire:click="extractPrompt"
+                wire:loading.attr="disabled"
+                class="flex items-center gap-2"
+            >
+                <span wire:loading.remove wire:target="extractPrompt,productId,image">
+                    Extract prompt
+                </span>
+                <span wire:loading.flex wire:target="extractPrompt" class="flex items-center gap-2">
+                    <x-loading-spinner class="size-4" />
+                    Processing…
+                </span>
+            </x-button>
         </div>
     </div>
 
-    @if ($promptResult)
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-6 py-5 sm:p-8 space-y-4">
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900">Extracted prompt</h3>
-                        <p class="text-sm text-gray-600">
-                            Paste this into your preferred image generation workflow as the reference prompt.
-                        </p>
-                    </div>
+    <div class="bg-white shadow sm:rounded-lg">
+        <div class="px-6 py-5 sm:p-8 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Prompt workspace</h3>
+                    <p class="text-sm text-gray-600">
+                        Your extracted prompt appears here. You can also edit or paste your own prompt before generating.
+                    </p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <x-secondary-button
+                        type="button"
+                        wire:click="generateImage"
+                        wire:loading.attr="disabled"
+                        class="flex items-center gap-2"
+                    >
+                        <span wire:loading.remove wire:target="generateImage">
+                            Generate image
+                        </span>
+                        <span wire:loading.flex wire:target="generateImage" class="flex items-center gap-2">
+                            <x-loading-spinner class="size-4" />
+                            Generating…
+                        </span>
+                    </x-secondary-button>
                     <button
                         type="button"
-                        class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                        class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
                         x-data="{ copied: false }"
                         x-on:click="navigator.clipboard.writeText(@js($promptResult)).then(() => { copied = true; setTimeout(() => copied = false, 2000); });"
                     >
@@ -165,9 +183,64 @@
                         <span x-text="copied ? 'Copied!' : 'Copy to clipboard'"></span>
                     </button>
                 </div>
+            </div>
 
-                <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-900 whitespace-pre-line leading-relaxed">
-                    {{ $promptResult }}
+            <div>
+                <label for="photo-studio-prompt" class="block text-sm font-medium text-gray-700">
+                    Prompt text
+                </label>
+                <textarea
+                    id="photo-studio-prompt"
+                    wire:model.defer="promptResult"
+                    rows="6"
+                    class="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                    placeholder="Paste or craft a prompt here if you’d like to skip extraction."
+                ></textarea>
+                <p class="mt-2 text-xs text-gray-500">
+                    This prompt is sent to the image model when you choose Generate image.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    @if ($latestGeneration)
+        <div class="bg-white shadow sm:rounded-lg">
+            <div class="px-6 py-5 sm:p-8 space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Generated image</h3>
+                        <p class="text-sm text-gray-600">
+                            Stored on {{ $latestGeneration['disk'] ?? 'configured storage' }} at {{ $latestGeneration['path'] ?? 'unknown path' }}.
+                        </p>
+                    </div>
+                    @if ($generatedImageUrl)
+                        <a
+                            href="{{ $generatedImageUrl }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                        >
+                            <svg class="size-4 text-gray-500 me-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.25L4.5 7.5m0 0l1.5 6m-1.5-6H7.5m10.5-3H9.75A2.25 2.25 0 007.5 4.5v0A2.25 2.25 0 009.75 6.75H18m0 0L16.5 1.5M18 6.75v10.5a2.25 2.25 0 01-2.25 2.25H9.75" />
+                            </svg>
+                            Open image
+                        </a>
+                    @endif
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    @if ($generatedImageUrl)
+                        <img
+                            src="{{ $generatedImageUrl }}"
+                            alt="Generated product render"
+                            class="w-full rounded-lg object-contain"
+                        />
+                    @else
+                        <p class="text-sm text-gray-700">
+                            The image has been stored but no public URL is available. Retrieve it from the {{ $latestGeneration['disk'] ?? 'configured' }} disk at
+                            <span class="font-mono text-xs">{{ $latestGeneration['path'] ?? 'unknown path' }}</span>.
+                        </p>
+                    @endif
                 </div>
             </div>
         </div>

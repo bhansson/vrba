@@ -3,15 +3,19 @@
 namespace Tests\Feature\PhotoStudio;
 
 use App\Livewire\PhotoStudio;
+use App\Jobs\GeneratePhotoStudioImage;
+use App\Models\PhotoStudioGeneration;
 use App\Models\Product;
 use App\Models\ProductFeed;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use MoeMizrak\LaravelOpenrouter\DTO\ChatData;
 use MoeMizrak\LaravelOpenrouter\DTO\ImageContentPartData;
-use MoeMizrak\LaravelOpenrouter\DTO\ResponseData;
 use MoeMizrak\LaravelOpenrouter\Facades\LaravelOpenRouter;
 use Tests\TestCase;
 
@@ -46,26 +50,23 @@ class PhotoStudioTest extends TestCase
             ->create([
                 'team_id' => $team->id,
                 'image_link' => 'https://cdn.example.com/reference.jpg',
+                'brand' => 'Acme',
             ]);
 
-        LaravelOpenRouter::shouldReceive('chatRequest')
-            ->once()
-            ->with(\Mockery::on(function ($chatData) use ($product) {
-                $this->assertInstanceOf(ChatData::class, $chatData);
-                $this->assertSame('openai/gpt-4.1', $chatData->model);
+        $this->fakeOpenRouter(function ($chatData) use ($product) {
+            $this->assertInstanceOf(ChatData::class, $chatData);
+            $this->assertSame('openai/gpt-4.1', $chatData->model);
 
-                $userMessage = Arr::get($chatData->messages, 1);
-                $this->assertNotNull($userMessage, 'User message missing from payload.');
+            $userMessage = Arr::get($chatData->messages, 1);
+            $this->assertNotNull($userMessage, 'User message missing from payload.');
 
-                $imagePart = collect($userMessage->content ?? [])
-                    ->first(fn ($part) => $part instanceof ImageContentPartData);
+            $imagePart = collect($userMessage->content ?? [])
+                ->first(fn ($part) => $part instanceof ImageContentPartData);
 
-                $this->assertNotNull($imagePart, 'Image payload missing from message.');
-                $this->assertSame($product->image_link, $imagePart->image_url->url);
+            $this->assertNotNull($imagePart, 'Image payload missing from message.');
+            $this->assertSame($product->image_link, $imagePart->image_url->url);
 
-                return true;
-            }))
-            ->andReturn(ResponseData::from([
+            return [
                 'id' => 'photo-studio-test',
                 'model' => 'openrouter/openai/gpt-4.1',
                 'object' => 'chat.completion',
@@ -73,7 +74,8 @@ class PhotoStudioTest extends TestCase
                 'choices' => [
                     ['message' => ['content' => 'High-end studio prompt']],
                 ],
-            ]));
+            ];
+        });
 
         $this->actingAs($user);
 
@@ -82,5 +84,427 @@ class PhotoStudioTest extends TestCase
             ->call('extractPrompt')
             ->assertSet('promptResult', 'High-end studio prompt')
             ->assertSet('productImagePreview', $product->image_link);
+    }
+
+    public function test_user_can_generate_image_and_queue_job(): void
+    {
+        config()->set('laravel-openrouter.api_key', 'test-key');
+        config()->set('services.photo_studio.image_model', 'google/gemini-2.5-flash-image');
+        config()->set('services.photo_studio.generation_disk', 's3');
+
+        Queue::fake();
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $feed = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+        ]);
+
+        $product = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+                'image_link' => 'https://cdn.example.com/reference.jpg',
+                'brand' => 'Acme',
+            ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(PhotoStudio::class)
+            ->set('productId', $product->id)
+            ->set('promptResult', 'Use this prompt as-is')
+            ->call('generateImage')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(GeneratePhotoStudioImage::class, function (GeneratePhotoStudioImage $job) use ($team, $user, $product) {
+            $this->assertSame($team->id, $job->teamId);
+            $this->assertSame($user->id, $job->userId);
+            $this->assertSame($product->id, $job->productId);
+            $this->assertSame('google/gemini-2.5-flash-image', $job->model);
+            $this->assertSame('s3', $job->disk);
+            $this->assertSame('product_image', $job->sourceType);
+
+            return true;
+        });
+    }
+
+    public function test_user_can_generate_image_with_prompt_only(): void
+    {
+        config()->set('laravel-openrouter.api_key', 'test-key');
+        config()->set('services.photo_studio.image_model', 'google/gemini-2.5-flash-image');
+        config()->set('services.photo_studio.generation_disk', 's3');
+
+        Queue::fake();
+
+        $user = User::factory()->withPersonalTeam()->create();
+
+        $this->actingAs($user);
+
+        Livewire::test(PhotoStudio::class)
+            ->set('promptResult', 'Manual creative prompt')
+            ->call('generateImage')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(GeneratePhotoStudioImage::class, function (GeneratePhotoStudioImage $job) use ($user) {
+            $this->assertSame($user->currentTeam->id, $job->teamId);
+            $this->assertSame($user->id, $job->userId);
+            $this->assertNull($job->productId);
+            $this->assertNull($job->imageInput);
+            $this->assertSame('prompt_only', $job->sourceType);
+
+            return true;
+        });
+    }
+
+    public function test_generate_photo_studio_image_job_persists_output(): void
+    {
+        config()->set('services.photo_studio.generation_disk', 's3');
+
+        Storage::fake('s3');
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $imagePayload = base64_encode('fake-image-binary');
+
+        $this->fakeOpenRouter(function () use ($imagePayload) {
+            return [
+                'id' => 'photo-studio-image',
+                'model' => 'google/gemini-2.5-flash-image',
+                'object' => 'chat.completion',
+                'created' => now()->timestamp,
+                'provider' => 'OpenRouter',
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => [
+                                [
+                                    'type' => 'output_image',
+                                    'image_base64' => $imagePayload,
+                                    'mime_type' => 'image/png',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'usage' => [
+                    'prompt_tokens' => 128,
+                    'completion_tokens' => 1,
+                ],
+            ];
+        });
+
+        $job = new GeneratePhotoStudioImage(
+            teamId: $team->id,
+            userId: $user->id,
+            productId: null,
+            prompt: 'Use this prompt as-is',
+            model: 'google/gemini-2.5-flash-image',
+            disk: 's3',
+            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            sourceType: 'uploaded_image',
+            sourceReference: 'upload.png'
+        );
+
+        $job->handle();
+
+        $generation = PhotoStudioGeneration::first();
+
+        $this->assertNotNull($generation);
+        $this->assertSame($team->id, $generation->team_id);
+        $this->assertSame($user->id, $generation->user_id);
+        $this->assertNull($generation->product_id);
+        $this->assertSame('google/gemini-2.5-flash-image', $generation->model);
+        $this->assertSame('s3', $generation->storage_disk);
+        $this->assertNotEmpty($generation->storage_path);
+
+        Storage::disk('s3')->assertExists($generation->storage_path);
+    }
+
+    public function test_generate_photo_studio_image_job_handles_attachment_pointers(): void
+    {
+        config()->set('services.photo_studio.generation_disk', 's3');
+
+        Storage::fake('s3');
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $pointerPayload = base64_encode('pointer-binary');
+
+        $this->fakeOpenRouter(function () use ($pointerPayload) {
+            return [
+                'id' => 'photo-studio-image',
+                'model' => 'google/gemini-2.5-flash-image',
+                'object' => 'chat.completion',
+                'created' => now()->timestamp,
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => [
+                                [
+                                    'type' => 'output_image',
+                                    'asset_pointer' => 'attachment://render-1',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'attachments' => [
+                    [
+                        'id' => 'render-1',
+                        'data' => [
+                            'mime_type' => 'image/png',
+                            'base64' => $pointerPayload,
+                        ],
+                    ],
+                ],
+            ];
+        });
+
+        $job = new GeneratePhotoStudioImage(
+            teamId: $team->id,
+            userId: $user->id,
+            productId: null,
+            prompt: 'Use this prompt as-is',
+            model: 'google/gemini-2.5-flash-image',
+            disk: 's3',
+            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            sourceType: 'uploaded_image',
+            sourceReference: 'upload.png'
+        );
+
+        $job->handle();
+
+        $generation = PhotoStudioGeneration::first();
+
+        $this->assertNotNull($generation);
+        $this->assertSame('s3', $generation->storage_disk);
+        $this->assertNotEmpty($generation->storage_path);
+
+        Storage::disk('s3')->assertExists($generation->storage_path);
+    }
+
+    public function test_generate_photo_studio_image_job_handles_inline_image_payload(): void
+    {
+        config()->set('services.photo_studio.generation_disk', 's3');
+
+        Storage::fake('s3');
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $inlinePayload = base64_encode('inline-binary');
+
+        $this->fakeOpenRouter(function () use ($inlinePayload) {
+            return [
+                'id' => 'photo-studio-image',
+                'model' => 'google/gemini-2.5-flash-image',
+                'object' => 'chat.completion',
+                'created' => now()->timestamp,
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => [
+                                [
+                                    'type' => 'output_image',
+                                    'image' => [
+                                        'mime_type' => 'image/png',
+                                        'base64' => $inlinePayload,
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ];
+        });
+
+        $job = new GeneratePhotoStudioImage(
+            teamId: $team->id,
+            userId: $user->id,
+            productId: null,
+            prompt: 'Use this prompt as-is',
+            model: 'google/gemini-2.5-flash-image',
+            disk: 's3',
+            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            sourceType: 'uploaded_image',
+            sourceReference: 'upload.png'
+        );
+
+        $job->handle();
+
+        $generation = PhotoStudioGeneration::first();
+
+        $this->assertNotNull($generation);
+        $this->assertSame('s3', $generation->storage_disk);
+        $this->assertNotEmpty($generation->storage_path);
+
+        Storage::disk('s3')->assertExists($generation->storage_path);
+    }
+
+    public function test_generate_photo_studio_image_job_handles_message_image_urls(): void
+    {
+        config()->set('services.photo_studio.generation_disk', 's3');
+
+        Storage::fake('s3');
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $inlinePayload = base64_encode('message-image');
+        $dataUri = 'data:image/png;base64,'.$inlinePayload;
+
+        $this->fakeOpenRouter(function () use ($dataUri) {
+            return [
+                'id' => 'photo-studio-image',
+                'model' => 'google/gemini-2.5-flash-image',
+                'object' => 'chat.completion',
+                'created' => now()->timestamp,
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => '',
+                            'images' => [
+                                [
+                                    'type' => 'image_url',
+                                    'image_url' => [
+                                        'url' => $dataUri,
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ];
+        });
+
+        $job = new GeneratePhotoStudioImage(
+            teamId: $team->id,
+            userId: $user->id,
+            productId: null,
+            prompt: 'Use this prompt as-is',
+            model: 'google/gemini-2.5-flash-image',
+            disk: 's3',
+            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            sourceType: 'uploaded_image',
+            sourceReference: 'upload.png'
+        );
+
+        $job->handle();
+
+        $generation = PhotoStudioGeneration::first();
+
+        $this->assertNotNull($generation);
+        $this->assertSame('s3', $generation->storage_disk);
+        $this->assertNotEmpty($generation->storage_path);
+
+        Storage::disk('s3')->assertExists($generation->storage_path);
+    }
+
+    public function test_generate_photo_studio_image_job_fetches_openrouter_file_with_headers(): void
+    {
+        config()->set('services.photo_studio.generation_disk', 's3');
+        config()->set('laravel-openrouter.api_key', 'test-key');
+        config()->set('laravel-openrouter.referer', 'https://example.com/app');
+        config()->set('laravel-openrouter.title', 'VRBA Test');
+
+        Storage::fake('s3');
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $requestLog = [];
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/file/*' => function ($request) use (&$requestLog) {
+                $requestLog[] = $request;
+
+                return Http::response('remote-binary', 200, [
+                    'Content-Type' => 'image/png',
+                ]);
+            },
+        ]);
+
+        $this->fakeOpenRouter(function () {
+            return [
+                'id' => 'photo-studio-image',
+                'model' => 'google/gemini-2.5-flash-image',
+                'object' => 'chat.completion',
+                'created' => now()->timestamp,
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => [
+                                [
+                                    'type' => 'image_url',
+                                    'image_url' => [
+                                        'url' => 'https://openrouter.ai/api/v1/file/abcd1234efgh5678',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ];
+        });
+
+        $job = new GeneratePhotoStudioImage(
+            teamId: $team->id,
+            userId: $user->id,
+            productId: null,
+            prompt: 'Use this prompt as-is',
+            model: 'google/gemini-2.5-flash-image',
+            disk: 's3',
+            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            sourceType: 'uploaded_image',
+            sourceReference: 'upload.png'
+        );
+
+        $job->handle();
+
+        $this->assertNotEmpty($requestLog, 'Expected HTTP request to OpenRouter file endpoint.');
+        $request = $requestLog[0];
+        $this->assertSame('Bearer test-key', $request->header('Authorization')[0]);
+        $this->assertSame('https://example.com/app', $request->header('HTTP-Referer')[0]);
+        $this->assertSame('VRBA Test', $request->header('X-Title')[0]);
+
+        $generation = PhotoStudioGeneration::first();
+        $this->assertNotNull($generation);
+        Storage::disk('s3')->assertExists($generation->storage_path);
+    }
+
+    private function fakeOpenRouter(callable $callback): void
+    {
+        $original = app('laravel-openrouter');
+
+        LaravelOpenRouter::swap(new class($callback)
+        {
+            public function __construct(private $callback)
+            {
+            }
+
+            public function chatRequest($chatData)
+            {
+                $payload = call_user_func($this->callback, $chatData);
+
+                return new class($payload)
+                {
+                    public function __construct(private array $payload)
+                    {
+                    }
+
+                    public function toArray(): array
+                    {
+                        return $this->payload;
+                    }
+                };
+            }
+        });
+
+        $this->beforeApplicationDestroyed(static function () use ($original): void {
+            LaravelOpenRouter::swap($original);
+        });
     }
 }

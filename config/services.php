@@ -41,6 +41,8 @@ return [
 
     'photo_studio' => [
         'model' => env('OPENROUTER_PHOTO_STUDIO_MODEL', 'openai/gpt-4.1'),
+        'image_model' => env('OPENROUTER_PHOTO_STUDIO_IMAGE_MODEL', 'google/gemini-2.5-flash-image'),
+        'generation_disk' => env('PHOTO_STUDIO_GENERATION_DISK', 's3'),
     ],
 
 ];

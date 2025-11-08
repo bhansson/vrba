@@ -2,12 +2,15 @@
 
 namespace App\Livewire;
 
+use App\Jobs\GeneratePhotoStudioImage;
+use App\Models\PhotoStudioGeneration;
 use App\Models\Product;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File as FileRule;
 use Illuminate\Validation\ValidationException;
@@ -41,6 +44,15 @@ class PhotoStudio extends Component
 
     public ?string $productImagePreview = null;
 
+    public ?string $generatedImageUrl = null;
+
+    /**
+     * @var array{path: string, disk: string, response_id: string|null}|null
+     */
+    public ?array $latestGeneration = null;
+
+    public ?string $generationStatus = null;
+
     /**
      * Light-weight product catalogue for the select element.
      *
@@ -73,6 +85,7 @@ class PhotoStudio extends Component
             ->toArray();
 
         $this->syncSelectedProductPreview();
+        $this->refreshLatestGeneration();
     }
 
     /**
@@ -81,6 +94,7 @@ class PhotoStudio extends Component
     public function updatedCreativeBrief(): void
     {
         $this->promptResult = null;
+        $this->resetGenerationPreview();
     }
 
     /**
@@ -93,6 +107,7 @@ class PhotoStudio extends Component
         }
 
         $this->promptResult = null;
+        $this->resetGenerationPreview();
         $this->syncSelectedProductPreview();
     }
 
@@ -103,6 +118,7 @@ class PhotoStudio extends Component
     {
         $this->productId = null;
         $this->promptResult = null;
+        $this->resetGenerationPreview();
         $this->productImagePreview = null;
     }
 
@@ -111,6 +127,7 @@ class PhotoStudio extends Component
         $this->resetErrorBag();
         $this->errorMessage = null;
         $this->promptResult = null;
+        $this->resetGenerationPreview();
 
         $this->validate();
 
@@ -165,6 +182,86 @@ class PhotoStudio extends Component
             $this->errorMessage = 'Unable to extract a prompt right now. Please try again in a moment.';
         } finally {
             $this->isProcessing = false;
+        }
+    }
+
+    public function generateImage(): void
+    {
+        $this->resetErrorBag();
+        $this->errorMessage = null;
+        $this->generationStatus = null;
+
+        if (! config('laravel-openrouter.api_key')) {
+            $this->errorMessage = 'Configure an OpenRouter API key before generating images.';
+
+            return;
+        }
+
+        if (! $this->promptResult) {
+            $this->errorMessage = 'Extract a prompt before generating an image.';
+
+            return;
+        }
+
+        $this->validate();
+
+        $disk = config('services.photo_studio.generation_disk', 's3');
+        $availableDisks = config('filesystems.disks', []);
+
+        if (! array_key_exists($disk, $availableDisks)) {
+            $this->errorMessage = 'The configured storage disk for Photo Studio is not available.';
+
+            return;
+        }
+
+        $team = Auth::user()?->currentTeam;
+
+        if (! $team) {
+            abort(403, 'Join or create a team to access the Photo Studio.');
+        }
+
+        try {
+            $imageInput = null;
+            $product = null;
+            $sourceType = 'prompt_only';
+            $sourceReference = null;
+
+            if ($this->hasImageSource()) {
+                [$imageInput, $product] = $this->resolveImageSource();
+                $sourceType = $this->image instanceof TemporaryUploadedFile ? 'uploaded_image' : 'product_image';
+                $sourceReference = $this->image instanceof TemporaryUploadedFile
+                    ? ($this->image->getClientOriginalName() ?: $this->image->getFilename())
+                    : $product?->image_link;
+            }
+
+            $model = config('services.photo_studio.image_model', 'google/gemini-2.5-flash-image');
+
+            $this->resetGenerationPreview();
+
+            GeneratePhotoStudioImage::dispatch(
+                teamId: $team->id,
+                userId: Auth::id(),
+                productId: $product?->id,
+                prompt: $this->promptResult,
+                model: $model,
+                disk: $disk,
+                imageInput: $imageInput,
+                sourceType: $sourceType,
+                sourceReference: $sourceReference,
+            );
+
+            $this->generationStatus = 'Image generation queued. The preview will appear once it finishes.';
+            $this->refreshLatestGeneration();
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            Log::error('Photo Studio image generation failed', [
+                'user_id' => Auth::id(),
+                'product_id' => $this->productId,
+                'exception' => $exception,
+            ]);
+
+            $this->errorMessage = 'Unable to generate an image right now. Please try again in a moment.';
         }
     }
 
@@ -251,7 +348,7 @@ class PhotoStudio extends Component
     private function buildMessages(string $imageUrl, ?Product $product): array
     {
         $systemPrompt = <<<'PROMPT'
-You are an expert visual art director and product photographer. The response must be plain text no longer than 300 words.
+You are an expert visual art director and product photographer. The response must be plain text no longer than 300 words. ONLY output the prompt text, no titles, pre text or comments, nothing else.
 PROMPT;
 
         $details = $product ? sprintf(
@@ -301,6 +398,51 @@ TEXT;
                 content: array_values(array_filter($contentParts))
             ),
         ];
+    }
+
+    private function resolveDiskUrl(string $disk, string $path): ?string
+    {
+        try {
+            return Storage::disk($disk)->url($path);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function resetGenerationPreview(): void
+    {
+        $this->generatedImageUrl = null;
+        $this->latestGeneration = null;
+    }
+
+    private function refreshLatestGeneration(): void
+    {
+        $teamId = Auth::user()?->currentTeam?->id;
+
+        if (! $teamId) {
+            $this->resetGenerationPreview();
+
+            return;
+        }
+
+        $latest = PhotoStudioGeneration::query()
+            ->where('team_id', $teamId)
+            ->latest()
+            ->first();
+
+        if (! $latest) {
+            $this->resetGenerationPreview();
+
+            return;
+        }
+
+        $this->latestGeneration = [
+            'path' => $latest->storage_path,
+            'disk' => $latest->storage_disk,
+            'response_id' => $latest->response_id,
+        ];
+
+        $this->generatedImageUrl = $this->resolveDiskUrl($latest->storage_disk, $latest->storage_path);
     }
 
     private function extractResponseContent(array $response): string
