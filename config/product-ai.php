@@ -70,7 +70,7 @@ return [
     */
     'default_templates' => [
         ProductAiTemplate::SLUG_DESCRIPTION_SUMMARY => [
-            'name' => 'Description Summary',
+            'name' => 'Summary',
             'description' => 'Generates a concise, high-converting summary (up to 60 words) highlighting why the product matters.',
             'system_prompt' => 'You are a product marketing assistant who writes short, high-converting product summaries. Always write every response using the language identified by the ISO code "{{ language }}". You MUST only respond with ONLY a valid plain text string. Keep formatting plain text.',
             'prompt' => <<<'PROMPT'
@@ -91,7 +91,7 @@ PROMPT,
         ],
 
         ProductAiTemplate::SLUG_DESCRIPTION => [
-            'name' => 'Product Description',
+            'name' => 'Description',
             'description' => 'Produces a detailed, conversion-focused product description between 100 and 500 words.',
             'system_prompt' => 'You are an ecommerce conversion copywriter who crafts persuasive, human-sounding product descriptions. Always write every response using the language identified by the ISO code "{{ language }}". You MUST only respond with ONLY a valid plain text string. Keep formatting plain text.',
             'prompt' => <<<'PROMPT'
@@ -112,7 +112,7 @@ PROMPT,
         ],
 
         ProductAiTemplate::SLUG_USPS => [
-            'name' => 'Unique Selling Points',
+            'name' => 'USP',
             'description' => 'Summarises between 3 to 6 concrete unique selling points as a JSON array of short bullet-friendly statements.',
             'system_prompt' => 'You are a conversion-focused marketer skilled at extracting concrete unique selling points from product data. Always write every bullet in the language identified by the ISO code "{{ language }}". You MUST only respond with ONLY a valid JSON array of strings.',
             'prompt' => <<<'PROMPT'

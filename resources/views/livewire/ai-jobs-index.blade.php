@@ -1,4 +1,4 @@
-@php use App\Models\ProductAiJob; use Illuminate\Support\Str; @endphp
+@php use App\Models\ProductAiJob; use App\Models\ProductAiTemplate; use Illuminate\Support\Str; @endphp
 @php
     $statusStyles = [
         ProductAiJob::STATUS_QUEUED => 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -7,9 +7,9 @@
         ProductAiJob::STATUS_FAILED => 'bg-red-100 text-red-800 border-red-300',
     ];
 
-    $jobTypeLabels = [
-        ProductAiJob::TYPE_TEMPLATE => 'Template',
-        ProductAiJob::TYPE_PHOTO_STUDIO => 'Photo Studio',
+    $jobTypeStyles = [
+        ProductAiJob::TYPE_TEMPLATE => 'bg-indigo-100 text-indigo-800 border-indigo-300',
+        ProductAiJob::TYPE_PHOTO_STUDIO => 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300',
     ];
 
 @endphp
@@ -65,13 +65,20 @@
                         </div>
                     </div>
                     <div class="col-span-2">
-                        @if ($job->job_type === ProductAiJob::TYPE_TEMPLATE)
-                            <div>
-                                {{ $job->template?->name ?? Str::headline($job->template?->slug ?? 'Template') }}
-                            </div>
-                        @else
-                            <div class="text-sm text-gray-900">Photo Studio</div>
-                        @endif
+                        @php
+                            $typeClasses = $jobTypeStyles[$job->job_type] ?? 'bg-gray-100 text-gray-800 border-gray-300';
+                            $typeLabel = match ($job->job_type) {
+                                ProductAiJob::TYPE_TEMPLATE => match ($job->template?->slug) {
+                                    ProductAiTemplate::SLUG_USPS => 'USP',
+                                    default => $job->template?->name ?? Str::headline($job->template?->slug ?? 'AI Template'),
+                                },
+                                ProductAiJob::TYPE_PHOTO_STUDIO => 'Photo Studio',
+                                default => Str::headline($job->job_type),
+                            };
+                        @endphp
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium {{ $typeClasses }}">
+                            {{ $typeLabel }}
+                        </span>
                     </div>
                     <div class="col-span-2">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full border text-xs font-medium {{ $statusStyles[$job->status] ?? 'bg-gray-100 text-gray-800 border-gray-300' }}">

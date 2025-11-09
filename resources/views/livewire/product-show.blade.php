@@ -194,7 +194,12 @@
                                 @endphp
                                 <section x-show="activeKey === '{{ $key }}'" x-cloak class="space-y-3">
                                         <div class="space-y-2">
-                                            <h3 class="text-sm font-semibold text-gray-900">{{ $template->name }}</h3>
+                                            @php
+                                                $templateDescription = trim((string) $template->description);
+                                            @endphp
+                                            <p class="text-sm text-gray-700">
+                                                {{ $templateDescription !== '' ? $templateDescription : 'No description available for this template.' }}
+                                            </p>
                                             <div class="space-y-2">
                                                 <x-button type="button"
                                                           wire:click="queueGeneration({{ $template->id }})"
