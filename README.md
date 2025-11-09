@@ -61,7 +61,7 @@ docker compose exec vite npm run build
 - Redis, cache, and session hosts are already wired to the `redis` container – no need for local services.
 - Set `RUN_MIGRATIONS=true` in your `.env` if you want the Octane container to migrate automatically on boot.
 - Node.js is bundled in the PHP image, so Octane file watching runs by default; switch it off with `OCTANE_WATCH=false` if you want a quieter container.
-- The PHP image extends `php:8.3-cli`, enabling Swoole, Redis, SQLite, MySQL, and PostgreSQL extensions. Tune PHP settings in `.docker/octane/php.ini`.
+- The PHP image extends `php:8.4-cli`, enabling Swoole, Redis, SQLite, MySQL, and PostgreSQL extensions. Tune PHP settings in `.docker/octane/php.ini`.
 - Automated tests now run against the `supabase-db` Postgres container (see `.env.testing`); ensure the service is up before running `php artisan test`.
 - OpenRouter access is optional; set `OPENROUTER_API_KEY` and related env vars when you want to enable product summaries. The Photo Studio page uses `OPENROUTER_PHOTO_STUDIO_MODEL` (default `openai/gpt-4.1`) to control which multimodal model extracts prompts from product shots.
 
