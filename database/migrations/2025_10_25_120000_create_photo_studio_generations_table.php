@@ -22,6 +22,8 @@ return new class extends Migration
             $table->string('model', 191);
             $table->string('storage_disk', 64);
             $table->string('storage_path', 2048);
+            $table->unsignedSmallInteger('image_width')->nullable();
+            $table->unsignedSmallInteger('image_height')->nullable();
             $table->string('response_id', 191)->nullable();
             $table->string('response_model', 191)->nullable();
             $table->json('response_metadata')->nullable();

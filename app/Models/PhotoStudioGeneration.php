@@ -25,6 +25,8 @@ class PhotoStudioGeneration extends Model
         'model',
         'storage_disk',
         'storage_path',
+        'image_width',
+        'image_height',
         'response_id',
         'response_model',
         'response_metadata',

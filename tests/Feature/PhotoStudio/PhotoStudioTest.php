@@ -433,7 +433,7 @@ class PhotoStudioTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
 
-        $imagePayload = base64_encode('fake-image-binary');
+        $imagePayload = $this->samplePngBase64();
 
         $this->fakeOpenRouter(function () use ($imagePayload) {
             return [
@@ -485,6 +485,9 @@ class PhotoStudioTest extends TestCase
         $this->assertSame('google/gemini-2.5-flash-image', $generation->model);
         $this->assertSame('s3', $generation->storage_disk);
         $this->assertNotEmpty($generation->storage_path);
+        $this->assertStringEndsWith('.jpg', $generation->storage_path);
+        $this->assertSame(1, $generation->image_width);
+        $this->assertSame(1, $generation->image_height);
 
         Storage::disk('s3')->assertExists($generation->storage_path);
     }
@@ -498,7 +501,7 @@ class PhotoStudioTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
 
-        $pointerPayload = base64_encode('pointer-binary');
+        $pointerPayload = $this->samplePngBase64();
 
         $this->fakeOpenRouter(function () use ($pointerPayload) {
             return [
@@ -562,7 +565,7 @@ class PhotoStudioTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
 
-        $inlinePayload = base64_encode('inline-binary');
+        $inlinePayload = $this->samplePngBase64();
 
         $this->fakeOpenRouter(function () use ($inlinePayload) {
             return [
@@ -620,7 +623,7 @@ class PhotoStudioTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
 
-        $inlinePayload = base64_encode('message-image');
+        $inlinePayload = $this->samplePngBase64();
         $dataUri = 'data:image/png;base64,'.$inlinePayload;
 
         $this->fakeOpenRouter(function () use ($dataUri) {
@@ -688,7 +691,7 @@ class PhotoStudioTest extends TestCase
             'https://openrouter.ai/api/v1/file/*' => function ($request) use (&$requestLog) {
                 $requestLog[] = $request;
 
-                return Http::response('remote-binary', 200, [
+                return Http::response($this->samplePngBinary(), 200, [
                     'Content-Type' => 'image/png',
                 ]);
             },
@@ -773,5 +776,21 @@ class PhotoStudioTest extends TestCase
         $this->beforeApplicationDestroyed(static function () use ($original): void {
             LaravelOpenRouter::swap($original);
         });
+    }
+
+    private function samplePngBase64(): string
+    {
+        return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==';
+    }
+
+    private function samplePngBinary(): string
+    {
+        $decoded = base64_decode($this->samplePngBase64(), true);
+
+        if ($decoded === false) {
+            $this->fail('Unable to decode sample PNG payload.');
+        }
+
+        return $decoded;
     }
 }

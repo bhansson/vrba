@@ -15,7 +15,8 @@
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.0",
         "livewire/livewire": "^3.6.4",
-        "moe-mizrak/laravel-openrouter": "^2.3"
+        "moe-mizrak/laravel-openrouter": "^2.3",
+      "ext-gd": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

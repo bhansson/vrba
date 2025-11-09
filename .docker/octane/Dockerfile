@@ -33,6 +33,7 @@ RUN apt-get update \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install --no-install-recommends --yes nodejs \
     && docker-php-ext-configure zip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install \
         bcmath \
         pcntl \
@@ -40,6 +41,7 @@ RUN apt-get update \
         pdo_mysql \
         pdo_pgsql \
         pdo_sqlite \
+        gd \
         zip \
     && pecl install redis \
     && docker-php-ext-enable redis \

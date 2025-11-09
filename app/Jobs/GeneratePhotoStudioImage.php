@@ -24,6 +24,8 @@ use Throwable;
 
 class GeneratePhotoStudioImage implements ShouldQueue
 {
+    private const JPG_QUALITY = 90;
+
     use Dispatchable;
     use InteractsWithQueue;
     use Queueable;
@@ -64,10 +66,11 @@ class GeneratePhotoStudioImage implements ShouldQueue
             $response = LaravelOpenRouter::chatRequest($chatData)->toArray();
 
             $imagePayload = $this->extractGeneratedImage($response);
+            $preparedImage = $this->prepareGeneratedImage($imagePayload['binary'], $imagePayload['extension']);
 
             $path = $this->storeGeneratedImage(
-                binary: $imagePayload['binary'],
-                extension: $imagePayload['extension']
+                binary: $preparedImage['binary'],
+                extension: $preparedImage['extension']
             );
 
             $metadata = array_filter([
@@ -85,6 +88,8 @@ class GeneratePhotoStudioImage implements ShouldQueue
                 'model' => $this->model,
                 'storage_disk' => $this->disk,
                 'storage_path' => $path,
+                'image_width' => $preparedImage['width'],
+                'image_height' => $preparedImage['height'],
                 'response_id' => $response['id'] ?? null,
                 'response_model' => $response['model'] ?? null,
                 'response_metadata' => $metadata ?: null,
@@ -605,6 +610,88 @@ PROMPT;
             'image/webp' => 'webp',
             default => 'png',
         };
+    }
+
+    /**
+     * @return array{binary: string, extension: string, width: int|null, height: int|null}
+     */
+    private function prepareGeneratedImage(string $binary, string $extension): array
+    {
+        [$width, $height] = $this->detectImageDimensions($binary);
+
+        if ($extension === 'png') {
+            $binary = $this->convertPngToJpg($binary);
+            $extension = 'jpg';
+
+            [$postWidth, $postHeight] = $this->detectImageDimensions($binary);
+            $width = $postWidth ?? $width;
+            $height = $postHeight ?? $height;
+        }
+
+        return [
+            'binary' => $binary,
+            'extension' => $extension,
+            'width' => $width,
+            'height' => $height,
+        ];
+    }
+
+    private function convertPngToJpg(string $binary): string
+    {
+        if (! function_exists('imagecreatefromstring') || ! function_exists('imagecreatetruecolor')) {
+            throw new RuntimeException('GD extension is required to convert PNG images.');
+        }
+
+        $png = @imagecreatefromstring($binary);
+
+        if ($png === false) {
+            throw new RuntimeException('Unable to decode PNG payload from provider response.');
+        }
+
+        $width = imagesx($png);
+        $height = imagesy($png);
+
+        $canvas = imagecreatetruecolor($width, $height);
+        imagealphablending($canvas, true);
+        imagesavealpha($canvas, false);
+
+        $background = imagecolorallocate($canvas, 255, 255, 255);
+        imagefilledrectangle($canvas, 0, 0, $width, $height, $background);
+        imagecopy($canvas, $png, 0, 0, 0, 0, $width, $height);
+
+        ob_start();
+        $written = imagejpeg($canvas, null, self::JPG_QUALITY);
+        $jpegBinary = ob_get_clean();
+
+        imagedestroy($png);
+        imagedestroy($canvas);
+
+        if ($jpegBinary === false || $written === false) {
+            throw new RuntimeException('Failed to convert PNG payload to JPG.');
+        }
+
+        return $jpegBinary;
+    }
+
+    /**
+     * @return array{0: int|null, 1: int|null}
+     */
+    private function detectImageDimensions(string $binary): array
+    {
+        if (! function_exists('getimagesizefromstring')) {
+            return [null, null];
+        }
+
+        $size = @getimagesizefromstring($binary);
+
+        if ($size === false) {
+            return [null, null];
+        }
+
+        return [
+            isset($size[0]) ? (int) $size[0] : null,
+            isset($size[1]) ? (int) $size[1] : null,
+        ];
     }
 
     private function detectMimeFromBinary(string $binary): ?string
