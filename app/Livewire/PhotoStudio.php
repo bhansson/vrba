@@ -346,31 +346,21 @@ class PhotoStudio extends Component
             return;
         }
 
-        $shouldConfirmGallery = $this->pendingProductId !== null && $this->pendingProductId === $this->productId;
+        $this->refreshProductGallery();
+        $latestGalleryId = $this->productGallery[0]['id'] ?? null;
 
-        if ($shouldConfirmGallery) {
-            $this->refreshProductGallery();
-            $latestGalleryId = $this->productGallery[0]['id'] ?? null;
+        if ($latestGalleryId !== $latest->id) {
+            $this->generationStatus = 'Image generation in progress…';
 
-            if ($latestGalleryId !== $latest->id) {
-                $this->generationStatus = 'Image generation in progress…';
-
-                return;
-            }
+            return;
         }
 
         $this->refreshLatestGeneration();
 
         $this->isAwaitingGeneration = false;
         $this->pendingGenerationBaselineId = null;
-        $this->generationStatus = $shouldConfirmGallery
-            ? 'New image added to the gallery.'
-            : 'New image finished.';
+        $this->generationStatus = 'New image added to the gallery.';
         $this->pendingProductId = null;
-
-        if ($shouldConfirmGallery) {
-            $this->refreshProductGallery();
-        }
     }
 
     public function deleteGeneration(int $generationId): void
@@ -381,13 +371,8 @@ class PhotoStudio extends Component
             abort(403, 'Join or create a team to access the Photo Studio.');
         }
 
-        if (! $this->productId) {
-            return;
-        }
-
         $generation = PhotoStudioGeneration::query()
             ->where('team_id', $team->id)
-            ->where('product_id', $this->productId)
             ->find($generationId);
 
         if (! $generation) {
@@ -593,10 +578,6 @@ TEXT;
     {
         $this->productGallery = [];
 
-        if (! $this->productId) {
-            return;
-        }
-
         $teamId = Auth::user()?->currentTeam?->id;
 
         if (! $teamId) {
@@ -604,13 +585,23 @@ TEXT;
         }
 
         $generations = PhotoStudioGeneration::query()
+            ->with(['product:id,title,sku,brand'])
             ->where('team_id', $teamId)
-            ->where('product_id', $this->productId)
             ->latest()
             ->get();
 
         $this->productGallery = $generations
             ->map(function (PhotoStudioGeneration $generation): array {
+                $product = $generation->product;
+                $productLabel = null;
+                $productMeta = null;
+
+                if ($product) {
+                    $productLabel = $product->title ?: 'Untitled product #'.$product->id;
+                    $metaParts = array_filter([$product->brand, $product->sku]);
+                    $productMeta = empty($metaParts) ? null : implode(' • ', $metaParts);
+                }
+
                 return [
                     'id' => $generation->id,
                     'url' => $this->resolveDiskUrl($generation->storage_disk, $generation->storage_path),
@@ -621,6 +612,16 @@ TEXT;
                     'download_url' => route('photo-studio.gallery.download', $generation),
                     'created_at' => optional($generation->created_at)->toDateTimeString(),
                     'created_at_human' => optional($generation->created_at)->diffForHumans(),
+                    'product' => $product ? [
+                        'id' => $product->id,
+                        'title' => $productLabel,
+                        'sku' => $product->sku,
+                        'brand' => $product->brand,
+                    ] : null,
+                    'product_label' => $productLabel,
+                    'product_meta' => $productMeta,
+                    'product_brand' => $product?->brand,
+                    'product_sku' => $product?->sku,
                 ];
             })
             ->toArray();

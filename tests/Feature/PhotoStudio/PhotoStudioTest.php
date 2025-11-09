@@ -215,7 +215,7 @@ class PhotoStudioTest extends TestCase
         });
     }
 
-    public function test_product_gallery_scopes_to_selected_product(): void
+    public function test_product_gallery_lists_all_team_generations(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -253,18 +253,6 @@ class PhotoStudioTest extends TestCase
         $secondGeneration = PhotoStudioGeneration::create([
             'team_id' => $team->id,
             'user_id' => $user->id,
-            'product_id' => $productA->id,
-            'source_type' => 'product_image',
-            'source_reference' => 'https://cdn.example.com/reference.png',
-            'prompt' => 'Studio prompt v2',
-            'model' => 'google/gemini-2.5-flash-image',
-            'storage_disk' => 's3',
-            'storage_path' => 'photo-studio/a-second.png',
-        ]);
-
-        PhotoStudioGeneration::create([
-            'team_id' => $team->id,
-            'user_id' => $user->id,
             'product_id' => $productB->id,
             'source_type' => 'product_image',
             'source_reference' => 'https://cdn.example.com/reference.png',
@@ -277,10 +265,10 @@ class PhotoStudioTest extends TestCase
         $this->actingAs($user);
 
         Livewire::test(PhotoStudio::class)
-            ->assertSet('productGallery', [])
-            ->set('productId', $productA->id)
             ->assertSet('productGallery.0.id', $secondGeneration->id)
-            ->assertSet('productGallery.1.id', $firstGeneration->id);
+            ->assertSet('productGallery.1.id', $firstGeneration->id)
+            ->assertSet('productGallery.0.product.id', $productB->id)
+            ->assertSet('productGallery.1.product.id', $productA->id);
     }
 
     public function test_poll_generation_status_refreshes_latest_image_and_gallery(): void
