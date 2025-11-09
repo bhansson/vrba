@@ -105,6 +105,7 @@ class ProductShowTest extends TestCase
                 'product_id' => $product->id,
                 'product_ai_template_id' => $template->id,
                 'status' => ProductAiJob::STATUS_QUEUED,
+                'job_type' => ProductAiJob::TYPE_TEMPLATE,
             ]);
 
             Queue::assertPushed(RunProductAiTemplateJob::class, function (RunProductAiTemplateJob $job) use ($product, $template): bool {

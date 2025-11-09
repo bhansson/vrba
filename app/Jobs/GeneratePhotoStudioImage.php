@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\PhotoStudioGeneration;
+use App\Models\ProductAiJob;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,6 +37,7 @@ class GeneratePhotoStudioImage implements ShouldQueue
     public ?int $timeout = 90;
 
     public function __construct(
+        public int $productAiJobId,
         public int $teamId,
         public int $userId,
         public ?int $productId,
@@ -51,7 +53,17 @@ class GeneratePhotoStudioImage implements ShouldQueue
 
     public function handle(): void
     {
+        $jobRecord = ProductAiJob::query()->findOrFail($this->productAiJobId);
+
         try {
+            $jobRecord->forceFill([
+                'status' => ProductAiJob::STATUS_PROCESSING,
+                'attempts' => $this->attempts(),
+                'started_at' => now(),
+                'progress' => 10,
+                'last_error' => null,
+            ])->save();
+
             $this->ensureDiskIsConfigured();
 
             $messages = $this->buildGenerationMessages($this->prompt, $this->imageInput);
@@ -68,6 +80,10 @@ class GeneratePhotoStudioImage implements ShouldQueue
             $imagePayload = $this->extractGeneratedImage($response);
             $preparedImage = $this->prepareGeneratedImage($imagePayload['binary'], $imagePayload['extension']);
 
+            $jobRecord->forceFill([
+                'progress' => 60,
+            ])->save();
+
             $path = $this->storeGeneratedImage(
                 binary: $preparedImage['binary'],
                 extension: $preparedImage['extension']
@@ -78,10 +94,11 @@ class GeneratePhotoStudioImage implements ShouldQueue
                 'usage' => $response['usage'] ?? null,
             ]);
 
-            PhotoStudioGeneration::create([
+            $generation = PhotoStudioGeneration::create([
                 'team_id' => $this->teamId,
                 'user_id' => $this->userId,
                 'product_id' => $this->productId,
+                'product_ai_job_id' => $jobRecord->id,
                 'source_type' => $this->sourceType,
                 'source_reference' => $this->sourceReference,
                 'prompt' => $this->prompt,
@@ -94,11 +111,28 @@ class GeneratePhotoStudioImage implements ShouldQueue
                 'response_model' => $response['model'] ?? null,
                 'response_metadata' => $metadata ?: null,
             ]);
+            $meta = $jobRecord->meta ?? [];
+            $meta['photo_studio_generation_id'] = $generation->id;
+
+            $jobRecord->forceFill([
+                'status' => ProductAiJob::STATUS_COMPLETED,
+                'progress' => 100,
+                'finished_at' => now(),
+                'meta' => $meta,
+            ])->save();
         } catch (Throwable $exception) {
+            $jobRecord->forceFill([
+                'status' => ProductAiJob::STATUS_FAILED,
+                'progress' => 0,
+                'finished_at' => now(),
+                'last_error' => Str::limit($exception->getMessage(), 500),
+            ])->save();
+
             Log::error('Photo Studio job failed', [
                 'team_id' => $this->teamId,
                 'user_id' => $this->userId,
                 'product_id' => $this->productId,
+                'product_ai_job_id' => $jobRecord->id,
                 'exception' => $exception,
             ]);
 

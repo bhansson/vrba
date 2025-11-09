@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class ProductAiJob extends Model
@@ -16,11 +17,15 @@ class ProductAiJob extends Model
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_FAILED = 'failed';
 
+    public const TYPE_TEMPLATE = 'template';
+    public const TYPE_PHOTO_STUDIO = 'photo_studio';
+
     protected $fillable = [
         'team_id',
         'product_id',
         'sku',
         'product_ai_template_id',
+        'job_type',
         'status',
         'progress',
         'attempts',
@@ -38,6 +43,10 @@ class ProductAiJob extends Model
         'meta' => 'array',
     ];
 
+    protected $attributes = [
+        'job_type' => self::TYPE_TEMPLATE,
+    ];
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
@@ -51,6 +60,11 @@ class ProductAiJob extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(ProductAiTemplate::class, 'product_ai_template_id');
+    }
+
+    public function photoStudioGeneration(): HasOne
+    {
+        return $this->hasOne(PhotoStudioGeneration::class, 'product_ai_job_id');
     }
 
     public function friendlyErrorMessage(): ?string

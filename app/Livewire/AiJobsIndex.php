@@ -35,7 +35,11 @@ class AiJobsIndex extends Component
         $team = Auth::user()->currentTeam;
 
         $jobsQuery = ProductAiJob::query()
-            ->with(['product:id,title,sku', 'template:id,name,slug'])
+            ->with([
+                'product:id,title,sku',
+                'template:id,name,slug',
+                'photoStudioGeneration:id,product_ai_job_id,storage_path,storage_disk',
+            ])
             ->where('team_id', $team->id);
 
         match ($this->filter) {

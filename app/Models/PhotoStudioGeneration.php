@@ -30,6 +30,7 @@ class PhotoStudioGeneration extends Model
         'response_id',
         'response_model',
         'response_metadata',
+        'product_ai_job_id',
     ];
 
     /**
@@ -52,5 +53,10 @@ class PhotoStudioGeneration extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function job(): BelongsTo
+    {
+        return $this->belongsTo(ProductAiJob::class, 'product_ai_job_id');
     }
 }

@@ -6,7 +6,7 @@ return [
     'defaults' => [
         'history_limit' => 10,
         'options' => [
-            'max_tokens' => 1600,
+            'max_tokens' => 3000,
         ],
         'description_excerpt_limit' => 600,
     ],

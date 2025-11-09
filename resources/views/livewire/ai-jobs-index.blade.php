@@ -1,10 +1,15 @@
-@php use Illuminate\Support\Str; @endphp
+@php use App\Models\ProductAiJob; use Illuminate\Support\Str; @endphp
 @php
     $statusStyles = [
-        \App\Models\ProductAiJob::STATUS_QUEUED => 'bg-yellow-100 text-yellow-800 border-yellow-300',
-        \App\Models\ProductAiJob::STATUS_PROCESSING => 'bg-blue-100 text-blue-800 border-blue-300',
-        \App\Models\ProductAiJob::STATUS_COMPLETED => 'bg-green-100 text-green-800 border-green-300',
-        \App\Models\ProductAiJob::STATUS_FAILED => 'bg-red-100 text-red-800 border-red-300',
+        ProductAiJob::STATUS_QUEUED => 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        ProductAiJob::STATUS_PROCESSING => 'bg-blue-100 text-blue-800 border-blue-300',
+        ProductAiJob::STATUS_COMPLETED => 'bg-green-100 text-green-800 border-green-300',
+        ProductAiJob::STATUS_FAILED => 'bg-red-100 text-red-800 border-red-300',
+    ];
+
+    $jobTypeLabels = [
+        ProductAiJob::TYPE_TEMPLATE => 'Template',
+        ProductAiJob::TYPE_PHOTO_STUDIO => 'Photo Studio',
     ];
 
 @endphp
@@ -43,7 +48,7 @@
         <div class="min-w-full divide-y divide-gray-200">
             <div class="grid grid-cols-12 px-4 py-3 bg-gray-50 text-xs font-semibold uppercase text-gray-600 gap-2">
                 <div class="col-span-4">Product</div>
-                <div class="col-span-2">Template</div>
+                <div class="col-span-2">Type</div>
                 <div class="col-span-2">Status</div>
                 <div class="col-span-2">Progress</div>
                 <div class="col-span-2 text-right">Queued</div>
@@ -60,13 +65,19 @@
                         </div>
                     </div>
                     <div class="col-span-2">
-                        {{ $job->template?->name ?? Str::headline($job->template?->slug ?? 'Template') }}
+                        @if ($job->job_type === ProductAiJob::TYPE_TEMPLATE)
+                            <div>
+                                {{ $job->template?->name ?? Str::headline($job->template?->slug ?? 'Template') }}
+                            </div>
+                        @else
+                            <div class="text-sm text-gray-900">Photo Studio</div>
+                        @endif
                     </div>
                     <div class="col-span-2">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full border text-xs font-medium {{ $statusStyles[$job->status] ?? 'bg-gray-100 text-gray-800 border-gray-300' }}">
                             {{ Str::headline($job->status) }}
                         </span>
-                        @if ($job->status === \App\Models\ProductAiJob::STATUS_FAILED && $job->friendlyErrorMessage())
+                        @if ($job->status === ProductAiJob::STATUS_FAILED && $job->friendlyErrorMessage())
                             <div class="mt-1 text-xs text-red-600">
                                 {{ $job->friendlyErrorMessage() }}
                             </div>

@@ -5,6 +5,7 @@ namespace Tests\Feature\PhotoStudio;
 use App\Livewire\PhotoStudio;
 use App\Jobs\GeneratePhotoStudioImage;
 use App\Models\PhotoStudioGeneration;
+use App\Models\ProductAiJob;
 use App\Models\Product;
 use App\Models\ProductFeed;
 use App\Models\User;
@@ -117,6 +118,13 @@ class PhotoStudioTest extends TestCase
             ->call('generateImage')
             ->assertHasNoErrors();
 
+        $this->assertDatabaseHas('product_ai_jobs', [
+            'team_id' => $team->id,
+            'product_id' => $product->id,
+            'job_type' => ProductAiJob::TYPE_PHOTO_STUDIO,
+            'status' => ProductAiJob::STATUS_QUEUED,
+        ]);
+
         Queue::assertPushed(GeneratePhotoStudioImage::class, function (GeneratePhotoStudioImage $job) use ($team, $user, $product) {
             $this->assertSame($team->id, $job->teamId);
             $this->assertSame($user->id, $job->userId);
@@ -148,6 +156,7 @@ class PhotoStudioTest extends TestCase
             ->for($feed, 'feed')
             ->create([
                 'team_id' => $team->id,
+                'brand' => 'Acme',
             ]);
 
         $existing = PhotoStudioGeneration::create([
@@ -189,6 +198,12 @@ class PhotoStudioTest extends TestCase
             ->call('generateImage')
             ->assertHasNoErrors();
 
+        $this->assertDatabaseHas('product_ai_jobs', [
+            'team_id' => $user->currentTeam->id,
+            'job_type' => ProductAiJob::TYPE_PHOTO_STUDIO,
+            'status' => ProductAiJob::STATUS_QUEUED,
+        ]);
+
         Queue::assertPushed(GeneratePhotoStudioImage::class, function (GeneratePhotoStudioImage $job) use ($user) {
             $this->assertSame($user->currentTeam->id, $job->teamId);
             $this->assertSame($user->id, $job->userId);
@@ -213,12 +228,14 @@ class PhotoStudioTest extends TestCase
             ->for($feed, 'feed')
             ->create([
                 'team_id' => $team->id,
+                'brand' => 'Acme A',
             ]);
 
         $productB = Product::factory()
             ->for($feed, 'feed')
             ->create([
                 'team_id' => $team->id,
+                'brand' => 'Acme B',
             ]);
 
         $firstGeneration = PhotoStudioGeneration::create([
@@ -279,6 +296,7 @@ class PhotoStudioTest extends TestCase
             ->for($feed, 'feed')
             ->create([
                 'team_id' => $team->id,
+                'brand' => 'Acme',
             ]);
 
         $this->actingAs($user);
@@ -329,12 +347,14 @@ class PhotoStudioTest extends TestCase
             ->for($feed, 'feed')
             ->create([
                 'team_id' => $team->id,
+                'brand' => 'Acme A',
             ]);
 
         $productB = Product::factory()
             ->for($feed, 'feed')
             ->create([
                 'team_id' => $team->id,
+                'brand' => 'Acme B',
             ]);
 
         $this->actingAs($user);
@@ -395,6 +415,7 @@ class PhotoStudioTest extends TestCase
             ->for($feed, 'feed')
             ->create([
                 'team_id' => $team->id,
+                'brand' => 'Acme',
             ]);
 
         $generation = PhotoStudioGeneration::create([
@@ -462,7 +483,10 @@ class PhotoStudioTest extends TestCase
             ];
         });
 
+        $jobRecord = $this->createPhotoStudioJob($team->id);
+
         $job = new GeneratePhotoStudioImage(
+            productAiJobId: $jobRecord->id,
             teamId: $team->id,
             userId: $user->id,
             productId: null,
@@ -533,7 +557,10 @@ class PhotoStudioTest extends TestCase
             ];
         });
 
+        $jobRecord = $this->createPhotoStudioJob($team->id);
+
         $job = new GeneratePhotoStudioImage(
+            productAiJobId: $jobRecord->id,
             teamId: $team->id,
             userId: $user->id,
             productId: null,
@@ -591,7 +618,10 @@ class PhotoStudioTest extends TestCase
             ];
         });
 
+        $jobRecord = $this->createPhotoStudioJob($team->id);
+
         $job = new GeneratePhotoStudioImage(
+            productAiJobId: $jobRecord->id,
             teamId: $team->id,
             userId: $user->id,
             productId: null,
@@ -650,7 +680,10 @@ class PhotoStudioTest extends TestCase
             ];
         });
 
+        $jobRecord = $this->createPhotoStudioJob($team->id);
+
         $job = new GeneratePhotoStudioImage(
+            productAiJobId: $jobRecord->id,
             teamId: $team->id,
             userId: $user->id,
             productId: null,
@@ -720,7 +753,10 @@ class PhotoStudioTest extends TestCase
             ];
         });
 
+        $jobRecord = $this->createPhotoStudioJob($team->id);
+
         $job = new GeneratePhotoStudioImage(
+            productAiJobId: $jobRecord->id,
             teamId: $team->id,
             userId: $user->id,
             productId: null,
@@ -743,6 +779,20 @@ class PhotoStudioTest extends TestCase
         $generation = PhotoStudioGeneration::first();
         $this->assertNotNull($generation);
         Storage::disk('s3')->assertExists($generation->storage_path);
+    }
+
+    private function createPhotoStudioJob(int $teamId, ?int $productId = null, ?string $sku = null): ProductAiJob
+    {
+        return ProductAiJob::create([
+            'team_id' => $teamId,
+            'product_id' => $productId,
+            'sku' => $sku,
+            'product_ai_template_id' => null,
+            'job_type' => ProductAiJob::TYPE_PHOTO_STUDIO,
+            'status' => ProductAiJob::STATUS_QUEUED,
+            'progress' => 0,
+            'queued_at' => now(),
+        ]);
     }
 
     private function fakeOpenRouter(callable $callback): void
@@ -780,7 +830,7 @@ class PhotoStudioTest extends TestCase
 
     private function samplePngBase64(): string
     {
-        return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==';
+        return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGgwJ/lAX0NwAAAABJRU5ErkJggg==';
     }
 
     private function samplePngBinary(): string

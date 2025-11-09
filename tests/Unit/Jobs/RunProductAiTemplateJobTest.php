@@ -77,6 +77,7 @@ class RunProductAiTemplateJobTest extends TestCase
             'product_id' => $product->id,
             'sku' => $product->sku,
             'product_ai_template_id' => $summaryTemplate->id,
+            'job_type' => ProductAiJob::TYPE_TEMPLATE,
             'status' => ProductAiJob::STATUS_QUEUED,
             'progress' => 0,
             'queued_at' => now(),

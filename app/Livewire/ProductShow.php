@@ -76,6 +76,7 @@ class ProductShow extends Component
                 'product_id' => $product->id,
                 'sku' => $product->sku,
                 'product_ai_template_id' => $template->id,
+                'job_type' => ProductAiJob::TYPE_TEMPLATE,
                 'status' => ProductAiJob::STATUS_QUEUED,
                 'progress' => 0,
                 'queued_at' => now(),

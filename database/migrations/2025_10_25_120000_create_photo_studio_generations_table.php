@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignIdFor(Team::class)->constrained()->cascadeOnDelete();
             $table->foreignIdFor(User::class)->constrained()->cascadeOnDelete();
             $table->foreignIdFor(Product::class)->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('product_ai_job_id')->nullable()->constrained('product_ai_jobs')->nullOnDelete();
             $table->string('source_type', 32);
             $table->string('source_reference', 2048)->nullable();
             $table->text('prompt');
@@ -31,6 +32,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index(['team_id', 'created_at']);
+            $table->index(['product_ai_job_id']);
         });
     }
 

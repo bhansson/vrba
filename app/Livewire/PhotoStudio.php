@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Jobs\GeneratePhotoStudioImage;
 use App\Models\PhotoStudioGeneration;
+use App\Models\ProductAiJob;
 use App\Models\Product;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
@@ -261,7 +262,25 @@ class PhotoStudio extends Component
 
             $this->resetGenerationPreview();
 
+            $jobRecord = ProductAiJob::create([
+                'team_id' => $team->id,
+                'product_id' => $product?->id,
+                'sku' => $product?->sku,
+                'product_ai_template_id' => null,
+                'job_type' => ProductAiJob::TYPE_PHOTO_STUDIO,
+                'status' => ProductAiJob::STATUS_QUEUED,
+                'progress' => 0,
+                'queued_at' => now(),
+                'meta' => array_filter([
+                    'source_type' => $sourceType,
+                    'source_reference' => $sourceReference,
+                    'prompt' => $this->promptResult,
+                    'model' => $model,
+                ]),
+            ]);
+
             GeneratePhotoStudioImage::dispatch(
+                productAiJobId: $jobRecord->id,
                 teamId: $team->id,
                 userId: Auth::id(),
                 productId: $product?->id,

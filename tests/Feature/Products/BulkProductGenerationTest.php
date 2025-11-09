@@ -61,14 +61,15 @@ class BulkProductGenerationTest extends TestCase
 
         Queue::assertPushed(RunProductAiTemplateJob::class, 2);
 
-        foreach ($products as $product) {
-            $this->assertDatabaseHas('product_ai_jobs', [
-                'product_id' => $product->id,
-                'product_ai_template_id' => $template->id,
-                'team_id' => $team->id,
-                'status' => ProductAiJob::STATUS_QUEUED,
-            ]);
-        }
+            foreach ($products as $product) {
+                $this->assertDatabaseHas('product_ai_jobs', [
+                    'product_id' => $product->id,
+                    'product_ai_template_id' => $template->id,
+                    'team_id' => $team->id,
+                    'status' => ProductAiJob::STATUS_QUEUED,
+                    'job_type' => ProductAiJob::TYPE_TEMPLATE,
+                ]);
+            }
     }
 
     public function test_bulk_generate_skips_products_without_skus(): void
@@ -126,6 +127,7 @@ class BulkProductGenerationTest extends TestCase
             'product_ai_template_id' => $template->id,
             'team_id' => $team->id,
             'status' => ProductAiJob::STATUS_QUEUED,
+            'job_type' => ProductAiJob::TYPE_TEMPLATE,
         ]);
 
         $this->assertDatabaseMissing('product_ai_jobs', [

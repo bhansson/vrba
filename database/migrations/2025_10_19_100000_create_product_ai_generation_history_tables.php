@@ -29,9 +29,10 @@ return new class extends Migration
         Schema::create('product_ai_jobs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_ai_template_id')->constrained('product_ai_templates')->cascadeOnDelete();
-            $table->string('sku', 191)->index();
+            $table->foreignId('product_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('product_ai_template_id')->nullable()->constrained('product_ai_templates')->nullOnDelete();
+            $table->string('job_type', 32)->default('template');
+            $table->string('sku', 191)->nullable()->index();
             $table->string('status', 32)->default('queued');
             $table->unsignedTinyInteger('progress')->default(0);
             $table->unsignedTinyInteger('attempts')->default(0);
@@ -42,6 +43,7 @@ return new class extends Migration
             $table->json('meta')->nullable();
             $table->timestamps();
 
+            $table->index(['team_id', 'job_type', 'status']);
             $table->index(['team_id', 'product_ai_template_id', 'status']);
             $table->index(['status', 'queued_at']);
         });
