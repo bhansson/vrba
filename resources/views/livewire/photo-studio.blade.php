@@ -157,20 +157,6 @@
                 <p class="text-sm text-gray-600">
                     Upload a shot or pull one from the catalog&mdash;the cleaner the reference, the stronger the generated prompt.
                 </p>
-                <ul class="text-sm text-gray-600 space-y-1">
-                    <li class="flex items-start gap-2">
-                        <svg class="mt-0.5 h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                            <path d="M16.667 5.833 8.75 13.75l-3.75-3.75" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        Use a single subject image with uncluttered lighting.
-                    </li>
-                    <li class="flex items-start gap-2">
-                        <svg class="mt-0.5 h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                            <path d="M16.667 5.833 8.75 13.75l-3.75-3.75" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        Switch to an existing product anytime&mdash;we’ll keep the latest prompt in sync.
-                    </li>
-                </ul>
             </div>
 
             <fieldset class="space-y-4" x-data="{ referencePanel: @js($referencePreference) }">
@@ -396,109 +382,107 @@
                     </span>
                 </x-button>
             </div>
-        </div>
-    </div>
 
-    <div class="bg-white shadow sm:rounded-2xl">
-        <div class="space-y-5 px-6 py-5 sm:p-8">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Shape the wording before you generate</h3>
-                    <p class="text-sm text-gray-600">
-                        Prompts extracted from the reference appear below&mdash;edit, combine, or paste your own instructions.
-                    </p>
-                </div>
-                <div class="flex flex-wrap items-center gap-3">
-                    <x-button
-                        type="button"
-                        wire:click="generateImage"
-                        wire:loading.attr="disabled"
-                        :disabled="! $hasPromptText"
-                        class="flex items-center gap-2 whitespace-nowrap"
-                    >
-                        <span wire:loading.remove wire:target="generateImage">
-                            Generate image
-                        </span>
-                        <span wire:loading.flex wire:target="generateImage" class="flex items-center gap-2">
-                            <x-loading-spinner class="size-4" />
-                            Generating…
-                        </span>
-                    </x-button>
-                    <button
-                        type="button"
-                        class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        x-data="{ copied: false }"
-                        x-on:click="if (@js($hasPromptText)) { navigator.clipboard.writeText(@js($promptResult)).then(() => { copied = true; setTimeout(() => copied = false, 2000); }); }"
-                        :disabled="! $hasPromptText"
-                    >
-                        <svg class="me-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16.5v2.25A2.25 2.25 0 0010.25 21h7.5A2.25 2.25 0 0020 18.75v-7.5A2.25 2.25 0 0017.75 9h-2.25M8 16.5h-2.25A2.25 2.25 0 013.5 14.25v-7.5A2.25 2.25 0 015.75 4.5h7.5A2.25 2.25 0 0115.5 6.75V9M8 16.5h6.75A2.25 2.25 0 0017 14.25V7.5M8 16.5A2.25 2.25 0 015.75 14.25V7.5" />
-                        </svg>
-                        <span x-text="copied ? 'Copied!' : 'Copy prompt'"></span>
-                    </button>
-                </div>
-            </div>
-
-            <div
-                @class([
-                    'rounded-xl border p-4 text-sm',
-                    $hasPromptText ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900',
-                ])
-            >
-                <div class="flex items-start gap-3">
-                    @if ($hasPromptText)
-                        <svg class="h-5 w-5 text-emerald-500" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                            <path d="m5 10 3 3 7-7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <div>
-                            <p class="font-semibold">Prompt ready.</p>
-                            <p class="text-emerald-900/80">Preview or refine it below before sending it to the model.</p>
-                        </div>
-                    @else
-                        <svg class="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                            <path d="M10 3.333 3.333 16.667h13.334L10 3.333Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
-                            <path d="m10 8.333.008 3.334" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
-                            <path d="M9.992 13.333h.016" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <div>
-                            <p class="font-semibold">No prompt yet.</p>
-                            <p class="text-amber-900/80">Run Extract prompt above or paste your own copy into the workspace.</p>
-                        </div>
-                    @endif
-                </div>
-            </div>
-
-            @if ($errorMessage)
-                <div class="rounded-md bg-red-50 p-4">
-                    <div class="flex">
-                        <div class="shrink-0">
-                            <svg class="size-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM9 5a1 1 0 012 0v5a1 1 0 01-2 0V5zm1 8a1.25 1.25 0 100 2.5A1.25 1.25 0 0010 13z" clip-rule="evenodd" />
+            <div class="space-y-5 border-t border-gray-100 pt-6">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Shape the wording before you generate</h3>
+                        <p class="text-sm text-gray-600">
+                            Prompts extracted from the reference appear below&mdash;edit, combine, or paste your own instructions.
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <x-button
+                            type="button"
+                            wire:click="generateImage"
+                            wire:loading.attr="disabled"
+                            :disabled="! $hasPromptText"
+                            class="flex items-center gap-2 whitespace-nowrap"
+                        >
+                            <span wire:loading.remove wire:target="generateImage">
+                                Generate image
+                            </span>
+                            <span wire:loading.flex wire:target="generateImage" class="flex items-center gap-2">
+                                <x-loading-spinner class="size-4" />
+                                Generating…
+                            </span>
+                        </x-button>
+                        <button
+                            type="button"
+                            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            x-data="{ copied: false }"
+                            x-on:click="if (@js($hasPromptText)) { navigator.clipboard.writeText(@js($promptResult)).then(() => { copied = true; setTimeout(() => copied = false, 2000); }); }"
+                            :disabled="! $hasPromptText"
+                        >
+                            <svg class="me-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16.5v2.25A2.25 2.25 0 0010.25 21h7.5A2.25 2.25 0 0020 18.75v-7.5A2.25 2.25 0 0017.75 9h-2.25M8 16.5h-2.25A2.25 2.25 0 013.5 14.25v-7.5A2.25 2.25 0 015.75 4.5h7.5A2.25 2.25 0 0115.5 6.75V9M8 16.5h6.75A2.25 2.25 0 0017 14.25V7.5M8 16.5A2.25 2.25 0 015.75 14.25V7.5" />
                             </svg>
-                        </div>
-                        <div class="ms-3">
-                            <h3 class="text-sm font-medium text-red-800">
-                                {{ $errorMessage }}
-                            </h3>
-                        </div>
+                            <span x-text="copied ? 'Copied!' : 'Copy prompt'"></span>
+                        </button>
                     </div>
                 </div>
-            @endif
 
-            <div>
-                <label for="photo-studio-prompt" class="block text-sm font-medium text-gray-700">
-                    Prompt text
-                </label>
-                <textarea
-                    id="photo-studio-prompt"
-                    wire:model.defer="promptResult"
-                    rows="6"
-                    class="mt-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    placeholder="Paste or craft a prompt here if you’d like to skip extraction."
-                ></textarea>
-                <p class="mt-2 text-xs text-gray-500">
-                    This prompt is sent to the image model when you choose Generate image.
-                </p>
+                <div
+                    @class([
+                        'rounded-xl border p-4 text-sm',
+                        $hasPromptText ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900',
+                    ])
+                >
+                    <div class="flex items-start gap-3">
+                        @if ($hasPromptText)
+                            <svg class="h-5 w-5 text-emerald-500" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                <path d="m5 10 3 3 7-7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <div>
+                                <p class="font-semibold">Prompt ready.</p>
+                                <p class="text-emerald-900/80">Preview or refine it below before sending it to the model.</p>
+                            </div>
+                        @else
+                            <svg class="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                <path d="M10 3.333 3.333 16.667h13.334L10 3.333Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="m10 8.333.008 3.334" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M9.992 13.333h.016" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <div>
+                                <p class="font-semibold">No prompt yet.</p>
+                                <p class="text-amber-900/80">Run Extract prompt above or paste your own copy into the workspace.</p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                @if ($errorMessage)
+                    <div class="rounded-md bg-red-50 p-4">
+                        <div class="flex">
+                            <div class="shrink-0">
+                                <svg class="size-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM9 5a1 1 0 012 0v5a1 1 0 01-2 0V5zm1 8a1.25 1.25 0 100 2.5A1.25 1.25 0 0010 13z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ms-3">
+                                <h3 class="text-sm font-medium text-red-800">
+                                    {{ $errorMessage }}
+                                </h3>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                <div>
+                    <label for="photo-studio-prompt" class="block text-sm font-medium text-gray-700">
+                        Prompt text
+                    </label>
+                    <textarea
+                        id="photo-studio-prompt"
+                        wire:model.defer="promptResult"
+                        rows="6"
+                        class="mt-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        placeholder="Paste or craft a prompt here if you’d like to skip extraction."
+                    ></textarea>
+                    <p class="mt-2 text-xs text-gray-500">
+                        This prompt is sent to the image model when you choose Generate image.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
