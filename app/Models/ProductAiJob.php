@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -65,6 +66,24 @@ class ProductAiJob extends Model
     public function photoStudioGeneration(): HasOne
     {
         return $this->hasOne(PhotoStudioGeneration::class, 'product_ai_job_id');
+    }
+
+    public function runtimeForHumans(?CarbonInterface $reference = null, int $parts = 2): ?string
+    {
+        if (! $this->started_at) {
+            return null;
+        }
+
+        $end = $this->finished_at ?? $reference ?? now();
+
+        return $this->started_at->diffForHumans(
+            $end,
+            [
+                'parts' => $parts,
+                'join' => true,
+                'syntax' => CarbonInterface::DIFF_ABSOLUTE,
+            ]
+        );
     }
 
     public function friendlyErrorMessage(): ?string

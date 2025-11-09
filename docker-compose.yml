@@ -32,7 +32,6 @@ services:
         PUID: ${PUID:-1000}
         PGID: ${PGID:-1000}
     image: vrba/octane:local
-    container_name: vrba-queue
     command: ["php", "artisan", "horizon"]
     environment:
       APP_ENV: ${APP_ENV:-local}

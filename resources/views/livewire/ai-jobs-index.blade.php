@@ -103,11 +103,11 @@
                     </div>
                     <div class="col-span-2 text-right text-xs text-gray-500">
                         <div>Queued {{ optional($job->queued_at)->diffForHumans() ?? 'N/A' }}</div>
-                        @if ($job->started_at)
-                            <div>Started {{ $job->started_at->diffForHumans() }}</div>
-                        @endif
-                        @if ($job->finished_at)
-                            <div>Finished {{ $job->finished_at->diffForHumans() }}</div>
+                        @php($runtimeLabel = $job->runtimeForHumans())
+                        @if ($runtimeLabel)
+                            <div>
+                                Runtime {{ $runtimeLabel }}@if (! $job->finished_at) <span class="text-gray-400">(running)</span>@endif
+                            </div>
                         @endif
                     </div>
                 </div>
