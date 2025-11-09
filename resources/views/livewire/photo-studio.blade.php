@@ -346,7 +346,6 @@
                 <div class="space-y-5 p-6">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Image details</p>
-                        <p class="mt-1 text-sm font-medium text-gray-900" x-text="selectedEntry && selectedEntry.created_at_human ? `Added ${selectedEntry.created_at_human}` : ''"></p>
                         <p class="text-xs text-gray-500" x-text="selectedEntry && selectedEntry.created_at ? selectedEntry.created_at : ''"></p>
                     </div>
                     <div>
@@ -365,33 +364,39 @@
                             :href="selectedEntry ? selectedEntry.url : '#'"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="inline-flex items-center rounded-full border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                            class="inline-flex size-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-gray-300 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
                         >
-                            View full size
+                            <span class="sr-only">View full size</span>
+                            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                <path d="M18 10s-3-4-8-4-8 4-8 4 3 4 8 4 8-4 8-4Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M10 8a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
                         </a>
                         <a
                             :href="selectedEntry ? selectedEntry.download_url : '#'"
                             download
-                            class="inline-flex items-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                            class="inline-flex size-10 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
                         >
-                            Download
+                            <span class="sr-only">Download image</span>
+                            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                <path d="M10 3v8m0 0 3-3m-3 3-3-3M4.5 13.5v1.25A1.25 1.25 0 0 0 5.75 16h8.5a1.25 1.25 0 0 0 1.25-1.25V13.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
                         </a>
                         <button
                             type="button"
-                            class="inline-flex items-center rounded-full border border-red-200 px-4 py-2 text-sm font-medium text-red-600 shadow-sm transition hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:opacity-60"
+                            class="inline-flex size-10 items-center justify-center rounded-full border border-red-200 text-red-600 shadow-sm transition hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:opacity-60"
                             wire:loading.attr="disabled"
                             wire:target="deleteGeneration"
                             x-on:click.prevent="if (!selectedEntry) { return; } if (!confirm('Delete this image from the gallery?')) { return; } $wire.deleteGeneration(selectedEntry.id).then(() => { closeOverlay(); });"
                         >
-                            <span class="flex items-center gap-2" wire:loading.remove wire:target="deleteGeneration">
-                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <span class="sr-only">Delete image</span>
+                            <span class="flex items-center justify-center" wire:loading.remove wire:target="deleteGeneration">
+                                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                                     <path d="m7 5 .867-1.3A1 1 0 0 1 8.7 3h2.6a1 1 0 0 1 .833.7L13 5m4 0H3m1 0 .588 11.18A1 1 0 0 0 5.587 17h8.826a1 1 0 0 0 .999-.82L16 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
-                                <span>Delete image</span>
                             </span>
-                            <span class="flex items-center gap-2" wire:loading.flex wire:target="deleteGeneration">
+                            <span class="flex items-center justify-center" wire:loading.flex wire:target="deleteGeneration">
                                 <x-loading-spinner class="size-4" />
-                                <span>Deleting…</span>
                             </span>
                         </button>
                     </div>
