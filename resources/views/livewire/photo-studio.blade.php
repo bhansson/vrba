@@ -452,28 +452,6 @@
                 @enderror
             </div>
 
-            @if ($generationStatus)
-                <div class="rounded-md bg-indigo-50 p-4 text-sm text-indigo-800" @if ($isAwaitingGeneration) wire:poll.3s="pollGenerationStatus" @endif>
-                    <div class="flex items-center gap-2">
-                        @if ($isAwaitingGeneration)
-                            <x-loading-spinner class="size-4" />
-                        @else
-                            <svg class="size-4 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                            </svg>
-                        @endif
-                        <span>{{ $generationStatus }}</span>
-                    </div>
-                </div>
-            @elseif ($isAwaitingGeneration)
-                <div class="rounded-md bg-indigo-50 p-4 text-sm text-indigo-800" wire:poll.3s="pollGenerationStatus">
-                    <div class="flex items-center gap-2">
-                        <x-loading-spinner class="size-4" />
-                        <span>Image generation in progress…</span>
-                    </div>
-                </div>
-            @endif
-
             <div class="flex flex-col gap-4 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-start gap-3 text-sm text-indigo-900">
                     <svg class="mt-1 h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -573,6 +551,28 @@
                     <p class="mt-2 text-xs text-gray-500">
                         This prompt is sent to the image model when you choose Generate image.
                     </p>
+
+                    @if ($generationStatus)
+                        <div class="mt-4 rounded-md bg-indigo-50 p-4 text-sm text-indigo-800" @if ($isAwaitingGeneration) wire:poll.3s="pollGenerationStatus" @endif>
+                            <div class="flex items-center gap-2">
+                                @if ($isAwaitingGeneration)
+                                    <x-loading-spinner class="size-4" />
+                                @else
+                                    <svg class="size-4 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                    </svg>
+                                @endif
+                                <span>{{ $generationStatus }}</span>
+                            </div>
+                        </div>
+                    @elseif ($isAwaitingGeneration)
+                        <div class="mt-4 rounded-md bg-indigo-50 p-4 text-sm text-indigo-800" wire:poll.3s="pollGenerationStatus">
+                            <div class="flex items-center gap-2">
+                                <x-loading-spinner class="size-4" />
+                                <span>Image generation in progress…</span>
+                            </div>
+                        </div>
+                    @endif
                     <div class="mt-4 flex flex-wrap items-center gap-3">
                         <x-button
                             type="button"
