@@ -384,42 +384,11 @@
             </div>
 
             <div class="space-y-5 border-t border-gray-100 pt-6">
-                <div class="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900">Shape the wording before you generate</h3>
-                        <p class="text-sm text-gray-600">
-                            Prompts extracted from the reference appear below&mdash;edit, combine, or paste your own instructions.
-                        </p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-3">
-                        <x-button
-                            type="button"
-                            wire:click="generateImage"
-                            wire:loading.attr="disabled"
-                            :disabled="! $hasPromptText"
-                            class="flex items-center gap-2 whitespace-nowrap"
-                        >
-                            <span wire:loading.remove wire:target="generateImage">
-                                Generate image
-                            </span>
-                            <span wire:loading.flex wire:target="generateImage" class="flex items-center gap-2">
-                                <x-loading-spinner class="size-4" />
-                                Generating…
-                            </span>
-                        </x-button>
-                        <button
-                            type="button"
-                            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            x-data="{ copied: false }"
-                            x-on:click="if (@js($hasPromptText)) { navigator.clipboard.writeText(@js($promptResult)).then(() => { copied = true; setTimeout(() => copied = false, 2000); }); }"
-                            :disabled="! $hasPromptText"
-                        >
-                            <svg class="me-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16.5v2.25A2.25 2.25 0 0010.25 21h7.5A2.25 2.25 0 0020 18.75v-7.5A2.25 2.25 0 0017.75 9h-2.25M8 16.5h-2.25A2.25 2.25 0 013.5 14.25v-7.5A2.25 2.25 0 015.75 4.5h7.5A2.25 2.25 0 0115.5 6.75V9M8 16.5h6.75A2.25 2.25 0 0017 14.25V7.5M8 16.5A2.25 2.25 0 015.75 14.25V7.5" />
-                            </svg>
-                            <span x-text="copied ? 'Copied!' : 'Copy prompt'"></span>
-                        </button>
-                    </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Shape the wording before you generate</h3>
+                    <p class="text-sm text-gray-600">
+                        Prompts extracted from the reference appear below&mdash;edit, combine, or paste your own instructions.
+                    </p>
                 </div>
 
                 <div
@@ -482,6 +451,35 @@
                     <p class="mt-2 text-xs text-gray-500">
                         This prompt is sent to the image model when you choose Generate image.
                     </p>
+                    <div class="mt-4 flex flex-wrap items-center gap-3">
+                        <x-button
+                            type="button"
+                            wire:click="generateImage"
+                            wire:loading.attr="disabled"
+                            :disabled="! $hasPromptText"
+                            class="flex items-center gap-2 whitespace-nowrap"
+                        >
+                            <span wire:loading.remove wire:target="generateImage">
+                                Generate image
+                            </span>
+                            <span wire:loading.flex wire:target="generateImage" class="flex items-center gap-2">
+                                <x-loading-spinner class="size-4" />
+                                Generating…
+                            </span>
+                        </x-button>
+                        <button
+                            type="button"
+                            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            x-data="{ copied: false }"
+                            x-on:click="if (@js($hasPromptText)) { navigator.clipboard.writeText(@js($promptResult)).then(() => { copied = true; setTimeout(() => copied = false, 2000); }); }"
+                            :disabled="! $hasPromptText"
+                        >
+                            <svg class="me-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16.5v2.25A2.25 2.25 0 0010.25 21h7.5A2.25 2.25 0 0020 18.75v-7.5A2.25 2.25 0 0017.75 9h-2.25M8 16.5h-2.25A2.25 2.25 0 013.5 14.25v-7.5A2.25 2.25 0 015.75 4.5h7.5A2.25 2.25 0 0115.5 6.75V9M8 16.5h6.75A2.25 2.25 0 0017 14.25V7.5M8 16.5A2.25 2.25 0 015.75 14.25V7.5" />
+                            </svg>
+                            <span x-text="copied ? 'Copied!' : 'Copy prompt'"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
