@@ -271,6 +271,86 @@ class PhotoStudioTest extends TestCase
             ->assertSet('productGallery.1.product.id', $productA->id);
     }
 
+    public function test_gallery_search_filters_by_prompt_text(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        $feed = ProductFeed::factory()->create([
+            'team_id' => $team->id,
+        ]);
+
+        $productA = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+                'title' => 'Cozy Cloud Sofa',
+                'sku' => 'COZY-001',
+            ]);
+
+        $productB = Product::factory()
+            ->for($feed, 'feed')
+            ->create([
+                'team_id' => $team->id,
+                'title' => 'Brutalist Arch Lamp',
+                'sku' => 'BRUT-900',
+            ]);
+
+        $matching = PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $productA->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Cozy studio couch scene',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/matching.png',
+        ]);
+
+        $other = PhotoStudioGeneration::create([
+            'team_id' => $team->id,
+            'user_id' => $user->id,
+            'product_id' => $productB->id,
+            'source_type' => 'product_image',
+            'source_reference' => 'https://cdn.example.com/reference.png',
+            'prompt' => 'Brutalist arch shot',
+            'model' => 'google/gemini-2.5-flash-image',
+            'storage_disk' => 's3',
+            'storage_path' => 'photo-studio/other.png',
+        ]);
+
+        $this->actingAs($user);
+
+        $component = Livewire::test(PhotoStudio::class)
+            ->assertSet('galleryTotal', 2);
+
+        $component
+            ->set('gallerySearch', 'cozy')
+            ->assertSet('productGallery.0.id', $matching->id)
+            ->assertSet('galleryTotal', 2);
+
+        $this->assertCount(1, $component->get('productGallery'));
+
+        $component
+            ->set('gallerySearch', 'brutal')
+            ->assertSet('productGallery.0.id', $other->id);
+
+        $component
+            ->set('gallerySearch', 'sofa')
+            ->assertSet('productGallery.0.id', $matching->id);
+
+        $component
+            ->set('gallerySearch', 'BRUT-900')
+            ->assertSet('productGallery.0.id', $other->id);
+
+        $component->set('gallerySearch', '')
+            ->assertSet('productGallery.0.id', $other->id);
+
+        $this->assertCount(2, $component->get('productGallery'));
+        $component->assertSet('galleryTotal', 2);
+    }
+
     public function test_poll_generation_status_refreshes_latest_image_and_gallery(): void
     {
         $user = User::factory()->withPersonalTeam()->create();

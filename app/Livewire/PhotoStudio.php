@@ -12,6 +12,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File as FileRule;
 use Illuminate\Validation\ValidationException;
@@ -60,6 +61,10 @@ class PhotoStudio extends Component
      * @var array<int, array<string, mixed>>
      */
     public array $productGallery = [];
+
+    public string $gallerySearch = '';
+
+    public int $galleryTotal = 0;
 
     public ?int $latestObservedGenerationId = null;
 
@@ -138,6 +143,11 @@ class PhotoStudio extends Component
         $this->promptResult = null;
         $this->resetGenerationPreview();
         $this->productImagePreview = null;
+        $this->refreshProductGallery();
+    }
+
+    public function updatedGallerySearch(): void
+    {
         $this->refreshProductGallery();
     }
 
@@ -577,6 +587,7 @@ TEXT;
     private function refreshProductGallery(): void
     {
         $this->productGallery = [];
+        $this->galleryTotal = 0;
 
         $teamId = Auth::user()?->currentTeam?->id;
 
@@ -584,9 +595,29 @@ TEXT;
             return;
         }
 
-        $generations = PhotoStudioGeneration::query()
+        $search = trim($this->gallerySearch);
+
+        $query = PhotoStudioGeneration::query()
+            ->where('team_id', $teamId);
+
+        $this->galleryTotal = (clone $query)->count();
+
+        if ($search !== '') {
+            $normalizedSearch = Str::lower($search);
+
+            $query->where(function ($builder) use ($normalizedSearch): void {
+                $builder
+                    ->whereRaw('LOWER(prompt) LIKE ?', ['%'.$normalizedSearch.'%'])
+                    ->orWhereHas('product', function ($productQuery) use ($normalizedSearch): void {
+                        $productQuery
+                            ->whereRaw('LOWER(title) LIKE ?', ['%'.$normalizedSearch.'%'])
+                            ->orWhereRaw('LOWER(sku) LIKE ?', ['%'.$normalizedSearch.'%']);
+                    });
+            });
+        }
+
+        $generations = $query
             ->with(['product:id,title,sku,brand'])
-            ->where('team_id', $teamId)
             ->latest()
             ->get();
 

@@ -20,7 +20,11 @@
         $selectedProduct = collect($products)->firstWhere('id', $productId);
         $hasReferenceSource = (bool) ($image || $productId);
         $hasPromptText = filled($promptResult);
-        $galleryHasEntries = ! empty($productGallery);
+        $galleryTotalCount = $galleryTotal ?? 0;
+        $filteredGalleryCount = count($productGallery);
+        $galleryHasEntries = $galleryTotalCount > 0;
+        $hasFilteredEntries = $filteredGalleryCount > 0;
+        $hasGallerySearch = filled($gallerySearch ?? '');
         $referencePreference = 'product';
 
     @endphp
@@ -29,16 +33,19 @@
         <div class="space-y-5 px-6 py-5 sm:p-8">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Review and manage your renders</h3>
+                    <h3 class="text-lg font-semibold text-gray-900">Gallery</h3>
                     <p class="text-sm text-gray-600">
-                        Every Photo Studio generation created by your team appears here once it finishes processing.
+                        The Photo Studio Gallery displays all generated product photos.
                     </p>
                 </div>
                 @if ($galleryHasEntries || $isAwaitingGeneration)
                     <div class="flex flex-col items-end text-right">
                         @if ($galleryHasEntries)
                             <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                {{ count($productGallery) }} image{{ count($productGallery) === 1 ? '' : 's' }}
+                                Showing {{ $filteredGalleryCount }} of {{ $galleryTotalCount }} image{{ $galleryTotalCount === 1 ? '' : 's' }}
+                                @if ($hasGallerySearch)
+                                    for &ldquo;{{ $gallerySearch }}&rdquo;
+                                @endif
                             </span>
                         @endif
                         @if ($isAwaitingGeneration)
@@ -51,6 +58,42 @@
                 @endif
             </div>
 
+            @if ($galleryHasEntries)
+                <div class="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div class="w-full sm:max-w-xs">
+                        <label for="photo-studio-gallery-search" class="block text-sm font-medium text-gray-700">
+                            Search photos
+                        </label>
+                        <div class="mt-1 flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <input
+                                    type="search"
+                                    id="photo-studio-gallery-search"
+                                    wire:model.live.debounce.400ms="gallerySearch"
+                                    placeholder="By prompt, title, or SKU..."
+                                    class="block w-full rounded-lg border border-gray-300 py-2 pl-3 pr-10 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                />
+                                <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400">
+                                    <svg class="h-4.5 w-4.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                        <path d="m14.5 14.5 3 3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                        <circle cx="9.5" cy="9" r="5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </div>
+                            </div>
+                            @if ($hasGallerySearch)
+                                <button
+                                    type="button"
+                                    wire:click="$set('gallerySearch', '')"
+                                    class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
+                                >
+                                    Clear
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @if (! $galleryHasEntries)
                 <div class="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/60 p-6 text-center text-sm text-indigo-900">
                     <p class="font-semibold text-indigo-900">This gallery is waiting for its first render.</p>
@@ -58,80 +101,166 @@
                         Generate an image to seed the gallery. Each run automatically appears here with download links and prompt context, no matter which product you selected.
                     </p>
                 </div>
+            @elseif (! $hasFilteredEntries)
+                <div class="rounded-2xl border border-dashed border-amber-200 bg-amber-50/80 p-6 text-center text-sm text-amber-900">
+                    <p class="font-semibold text-amber-900">No renders match &ldquo;{{ $gallerySearch }}&rdquo;.</p>
+                    <p class="mt-1">Update your search terms or clear the filter to browse all {{ $galleryTotalCount }} image{{ $galleryTotalCount === 1 ? '' : 's' }}.</p>
+                    <button
+                        type="button"
+                        wire:click="$set('gallerySearch', '')"
+                        class="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-amber-900 shadow-sm ring-1 ring-amber-200 transition hover:bg-amber-50"
+                    >
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <path d="m6 6 8 8M14 6l-8 8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        Clear search
+                    </button>
+                </div>
             @else
-                <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 justify-items-center">
-                    @foreach ($productGallery as $entry)
-                        <div class="flex flex-col rounded-2xl border border-gray-200 bg-gray-50 p-5 w-full max-w-64 sm:max-w-80" wire:key="gallery-{{ $entry['id'] }}">
-                            @if ($entry['url'])
-                                <div class="group relative aspect-square">
-                                    <button
-                                        type="button"
-                                        class="block h-full w-full overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                                        @click="openOverlay(@js($entry))"
-                                    >
-                                        <img
-                                            src="{{ $entry['url'] }}"
-                                            alt="Generated render"
-                                            class="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
-                                        />
-                                        <span class="sr-only">Open gallery details for this image</span>
-                                    </button>
-                                    <a
-                                        href="{{ route('photo-studio.gallery.download', $entry['id']) }}"
-                                        download
-                                        class="absolute right-2 top-2 inline-flex items-center rounded-full border border-white/70 bg-white/90 p-1 text-gray-600 shadow-sm ring-1 ring-black/10 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                                        title="Download image"
-                                    >
-                                        <span class="sr-only">Download image</span>
-                                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                                            <path d="M10 3v8m0 0 3-3m-3 3-3-3M4.5 13.5v1.25A1.25 1.25 0 0 0 5.75 16h8.5a1.25 1.25 0 0 0 1.25-1.25V13.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
-                                        </svg>
-                                    </a>
-                                </div>
-                            @else
-                                <div class="flex aspect-square items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white p-4 text-center text-sm text-gray-500">
-                                    <div>
-                                        <p>Stored on {{ $entry['disk'] }}</p>
-                                        <p class="mt-1 break-all font-mono text-xs">{{ $entry['path'] }}</p>
-                                    </div>
-                                </div>
-                            @endif
+                <div
+                    class="relative"
+                    x-data="{
+                        atStart: true,
+                        atEnd: false,
+                        scrollTrack(direction) {
+                            const track = this.$refs.track;
+                            if (!track) {
+                                return;
+                            }
 
-                            <div class="mt-3 text-xs text-gray-500">
-                                @if (! empty($entry['product_label']))
-                                    <p class="text-sm font-semibold text-gray-800">{{ $entry['product_label'] }}</p>
-                                    @if (! empty($entry['product_brand']) || ! empty($entry['product_sku']))
-                                        <p class="text-xs text-gray-500">
-                                            @if (! empty($entry['product_brand']))
-                                                <span>{{ $entry['product_brand'] }}</span>
+                            const distance = track.clientWidth * 0.85;
+                            track.scrollBy({ left: direction === 'next' ? distance : -distance, behavior: 'smooth' });
+                        },
+                        updateScrollState() {
+                            const track = this.$refs.track;
+                            if (!track) {
+                                return;
+                            }
+
+                            const tolerance = 4;
+                            this.atStart = track.scrollLeft <= tolerance;
+                            this.atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - tolerance;
+                        }
+                    }"
+                    x-init="updateScrollState()"
+                    x-effect="updateScrollState()"
+                    x-on:resize.window.debounce.200ms="updateScrollState()"
+                >
+                    <div class="relative">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-white"></div>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white"></div>
+
+                        <div class="absolute left-0 top-1/2 z-10 -translate-y-1/2">
+                            <button
+                                type="button"
+                                class="rounded-full bg-white/90 p-2 text-gray-600 shadow ring-1 ring-gray-200 transition hover:bg-white"
+                                :class="atStart ? 'cursor-not-allowed opacity-40' : ''"
+                                @click="scrollTrack('previous')"
+                                :disabled="atStart"
+                                aria-label="Show previous renders"
+                            >
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                    <path d="m12 5-5 5 5 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="absolute right-0 top-1/2 z-10 -translate-y-1/2">
+                            <button
+                                type="button"
+                                class="rounded-full bg-white/90 p-2 text-gray-600 shadow ring-1 ring-gray-200 transition hover:bg-white"
+                                :class="atEnd ? 'cursor-not-allowed opacity-40' : ''"
+                                @click="scrollTrack('next')"
+                                :disabled="atEnd"
+                                aria-label="Show more renders"
+                            >
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                    <path d="m8 5 5 5-5 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div
+                            x-ref="track"
+                            class="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 pl-4 pr-4 scroll-smooth sm:gap-6"
+                            @scroll.debounce.100ms="updateScrollState()"
+                            tabindex="0"
+                            aria-label="Photo Studio gallery slider"
+                        >
+                            @foreach ($productGallery as $entry)
+                                <div class="flex w-64 shrink-0 flex-col rounded-2xl border border-gray-200 bg-gray-50 p-5 sm:w-72 lg:w-80" wire:key="gallery-{{ $entry['id'] }}">
+                                    @if ($entry['url'])
+                                        <div class="group relative aspect-square">
+                                            <button
+                                                type="button"
+                                                class="block h-full w-full overflow-hidden rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                                                @click="openOverlay(@js($entry))"
+                                            >
+                                                <img
+                                                    src="{{ $entry['url'] }}"
+                                                    alt="Generated render"
+                                                    class="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
+                                                />
+                                                <span class="sr-only">Open gallery details for this image</span>
+                                            </button>
+                                            <a
+                                                href="{{ route('photo-studio.gallery.download', $entry['id']) }}"
+                                                download
+                                                class="absolute right-2 top-2 inline-flex items-center rounded-full border border-white/70 bg-white/90 p-1 text-gray-600 shadow-sm ring-1 ring-black/10 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                                                title="Download image"
+                                            >
+                                                <span class="sr-only">Download image</span>
+                                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                                    <path d="M10 3v8m0 0 3-3m-3 3-3-3M4.5 13.5v1.25A1.25 1.25 0 0 0 5.75 16h8.5a1.25 1.25 0 0 0 1.25-1.25V13.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            </a>
+                                        </div>
+                                    @else
+                                        <div class="flex aspect-square items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white p-4 text-center text-sm text-gray-500">
+                                            <div>
+                                                <p>Stored on {{ $entry['disk'] }}</p>
+                                                <p class="mt-1 break-all font-mono text-xs">{{ $entry['path'] }}</p>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    <div class="mt-3 text-xs text-gray-500">
+                                        @if (! empty($entry['product_label']))
+                                            <p class="text-sm font-semibold text-gray-800">{{ $entry['product_label'] }}</p>
+                                            @if (! empty($entry['product_brand']) || ! empty($entry['product_sku']))
+                                                <p class="text-xs text-gray-500">
+                                                    @if (! empty($entry['product_brand']))
+                                                        <span>{{ $entry['product_brand'] }}</span>
+                                                    @endif
+                                                    @if (! empty($entry['product_brand']) && ! empty($entry['product_sku']))
+                                                        <span class="mx-1 text-gray-400">&middot;</span>
+                                                    @endif
+                                                    @if (! empty($entry['product_sku']))
+                                                        <span class="text-gray-400">{{ $entry['product_sku'] }}</span>
+                                                    @endif
+                                                </p>
                                             @endif
-                                            @if (! empty($entry['product_brand']) && ! empty($entry['product_sku']))
-                                                <span class="mx-1 text-gray-400">&middot;</span>
-                                            @endif
-                                            @if (! empty($entry['product_sku']))
-                                                <span class="text-gray-400">{{ $entry['product_sku'] }}</span>
-                                            @endif
+                                        @else
+                                            <span>Generated without a catalog product</span>
+                                        @endif
+                                    </div>
+
+                                    @if (! empty($entry['prompt']))
+                                        <p class="mt-2 text-sm text-gray-700" title="{{ $entry['prompt'] }}">
+                                            “{{ \Illuminate\Support\Str::limit($entry['prompt'], 110) }}”
                                         </p>
                                     @endif
-                                @else
-                                    <span>Generated without a catalog product</span>
-                                @endif
-                            </div>
 
-                            @if (! empty($entry['prompt']))
-                                <p class="mt-2 text-sm text-gray-700" title="{{ $entry['prompt'] }}">
-                                    “{{ \Illuminate\Support\Str::limit($entry['prompt'], 110) }}”
-                                </p>
-                            @endif
-
-                            <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
-                                <span>{{ $entry['model'] ?: 'Unknown model' }}</span>
-                                @if (! empty($entry['created_at_human']))
-                                    <span>{{ $entry['created_at_human'] }}</span>
-                                @endif
-                            </div>
+                                    <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
+                                        <span>{{ $entry['model'] ?: 'Unknown model' }}</span>
+                                        @if (! empty($entry['created_at_human']))
+                                            <span>{{ $entry['created_at_human'] }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
                         </div>
-                    @endforeach
+                    </div>
                 </div>
             @endif
         </div>
@@ -143,7 +272,7 @@
             <div class="space-y-2">
                 <div class="flex flex-wrap items-baseline justify-between gap-3">
                     <h3 class="text-lg font-semibold text-gray-900">
-                        Choose a clear product photo
+                        Create new product photo
                     </h3>
                     @if ($selectedProduct)
                         <span class="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
@@ -155,15 +284,12 @@
                     @endif
                 </div>
                 <p class="text-sm text-gray-600">
-                    Upload a shot or pull one from the catalog&mdash;the cleaner the reference, the stronger the generated prompt.
+                    Upload image or choose a product from the catalog.
                 </p>
             </div>
 
             <fieldset class="space-y-4" x-data="{ referencePanel: @js($referencePreference) }">
                 <legend class="text-sm font-semibold text-gray-900">Provide your reference</legend>
-                <p class="text-sm text-gray-600">
-                    Upload a new photo or pull the primary image from a catalog product&mdash;whichever is fastest right now.
-                </p>
                 <div class="inline-flex rounded-full border border-gray-200 bg-gray-50 p-1 text-sm font-semibold text-gray-600" role="tablist">
                     <button
                         type="button"
@@ -235,7 +361,6 @@
 
                     <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" x-show="referencePanel === 'product'" x-transition x-cloak>
                         <div class="flex items-center justify-between">
-                            <p class="text-sm font-semibold text-gray-900">Use a catalog product</p>
                             @if ($selectedProduct && ! $image)
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                                     <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -245,9 +370,6 @@
                                 </span>
                             @endif
                         </div>
-                        <p class="mt-1 text-sm text-gray-600">
-                            Snag the primary image from any synced product feed entry.
-                        </p>
 
                         <label for="photo-studio-product" class="mt-4 block text-sm font-medium text-gray-700">
                             Product
