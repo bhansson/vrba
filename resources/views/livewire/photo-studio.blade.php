@@ -25,6 +25,11 @@
         $galleryHasEntries = $galleryTotalCount > 0;
         $hasFilteredEntries = $filteredGalleryCount > 0;
         $hasGallerySearch = filled($gallerySearch ?? '');
+        $productMatchesCount = count($products);
+        $hasProductSearch = filled($productSearch ?? '');
+        $selectedProductLabel = $selectedProduct
+            ? trim(($selectedProduct['title'] ?? 'Untitled product').' '.(($selectedProduct['sku'] ?? null) ? '— '.$selectedProduct['sku'] : ''))
+            : '';
         $referencePreference = 'product';
 
     @endphp
@@ -371,24 +376,162 @@
                             @endif
                         </div>
 
-                        <label for="photo-studio-product" class="mt-4 block text-sm font-medium text-gray-700">
-                            Product
-                        </label>
-                        <select
-                            id="photo-studio-product"
-                            wire:model.live="productId"
-                            class="mt-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        <div
+                            class="mt-4"
+                            x-data="{
+                                open: false,
+                                search: @entangle('productSearch').live,
+                                selectedId: @entangle('productId'),
+                                selectedLabel: @js($selectedProductLabel),
+                                showList() {
+                                    this.open = true;
+                                },
+                                hideList() {
+                                    this.open = false;
+                                },
+                                handleInput() {
+                                    if (! this.open) {
+                                        this.showList();
+                                    }
+
+                                    if (this.search !== this.selectedLabel && this.selectedId) {
+                                        this.selectedId = null;
+                                    }
+
+                                    if (this.search === '') {
+                                        this.selectedLabel = '';
+                                    }
+                                },
+                                selectProduct(option) {
+                                    const id = option.dataset.productId;
+
+                                    if (id) {
+                                        this.selectedId = Number(id);
+                                    }
+
+                                    this.selectedLabel = option.dataset.label || this.search;
+                                    this.search = this.selectedLabel;
+                                    this.hideList();
+                                },
+                                clearSearch() {
+                                    this.search = '';
+                                    this.selectedId = null;
+                                    this.selectedLabel = '';
+                                    this.showList();
+                                    this.$nextTick(() => this.$refs.productSearch?.focus());
+                                },
+                            }"
                         >
-                            <option value="">Select a product…</option>
-                            @foreach ($products as $product)
-                                <option value="{{ $product['id'] }}">
-                                    {{ $product['title'] }}
-                                    @if (! empty($product['sku']))
-                                        &mdash; {{ $product['sku'] }}
-                                    @endif
-                                </option>
-                            @endforeach
-                        </select>
+                            <label for="photo-studio-product-search" class="block text-sm font-medium text-gray-700">
+                                Catalog product
+                            </label>
+                            <div class="relative mt-2" @click.outside="hideList()">
+                                <input
+                                    id="photo-studio-product-search"
+                                    x-ref="productSearch"
+                                    type="search"
+                                    x-model.debounce.400ms="search"
+                                    @focus="showList()"
+                                    @input="handleInput()"
+                                    @keydown.escape.stop="hideList()"
+                                    placeholder="Search by title, SKU, or brand"
+                                    class="block w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    role="combobox"
+                                    :aria-expanded="open.toString()"
+                                    aria-controls="photo-studio-product-options"
+                                    autocomplete="off"
+                                />
+                                <div class="absolute inset-y-0 right-3 flex items-center gap-1 text-gray-400">
+                                    <button
+                                        type="button"
+                                        x-show="search.length"
+                                        x-cloak
+                                        @click="clearSearch()"
+                                        class="rounded-full p-1 text-gray-400 transition hover:text-gray-600"
+                                        aria-label="Clear product search"
+                                    >
+                                        <svg class="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                                            <path d="m3 3 8 8M11 3l-8 8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                    <svg class="h-4.5 w-4.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                        <path d="m14.5 14.5 3 3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                        <circle cx="9.5" cy="9" r="5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </div>
+
+                                <div
+                                    x-show="open"
+                                    x-transition
+                                    x-cloak
+                                    class="absolute z-10 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl"
+                                >
+                                    <ul
+                                        class="max-h-64 divide-y divide-gray-100 overflow-y-auto"
+                                        id="photo-studio-product-options"
+                                        role="listbox"
+                                    >
+                                        @forelse ($products as $product)
+                                            @php
+                                                $productLabel = trim(($product['title'] ?? 'Untitled product').' '.(! empty($product['sku']) ? '— '.$product['sku'] : ''));
+                                                $isSelected = (int) ($productId ?? 0) === (int) $product['id'];
+                                            @endphp
+                                            <li wire:key="photo-studio-product-{{ $product['id'] }}">
+                                                <button
+                                                    type="button"
+                                                    class="flex w-full items-start justify-between gap-3 px-4 py-3 text-left text-sm text-gray-900 transition hover:bg-indigo-50"
+                                                    :class="{ 'bg-indigo-50 text-indigo-900': Number(selectedId) === {{ $product['id'] }} }"
+                                                    data-option
+                                                    data-label="{{ $productLabel }}"
+                                                    data-product-id="{{ $product['id'] }}"
+                                                    role="option"
+                                                    aria-selected="{{ $isSelected ? 'true' : 'false' }}"
+                                                    :aria-selected="(Number(selectedId) === {{ $product['id'] }}) ? 'true' : 'false'"
+                                                    x-on:mousedown.prevent
+                                                    @click="selectProduct($event.currentTarget)"
+                                                    wire:click="$set('productId', {{ $product['id'] }})"
+                                                >
+                                                    <div class="flex-1">
+                                                        <p class="font-semibold">{{ $product['title'] }}</p>
+                                                        <p class="mt-0.5 text-xs text-gray-500">
+                                                            SKU: {{ $product['sku'] ?: '—' }}
+                                                            @if (! empty($product['brand']))
+                                                                &middot; Brand: {{ $product['brand'] }}
+                                                            @endif
+                                                        </p>
+                                                    </div>
+                                                    <svg
+                                                        class="h-4.5 w-4.5 text-emerald-500 {{ $isSelected ? '' : 'hidden' }}"
+                                                        :class="{ 'hidden': Number(selectedId) !== {{ $product['id'] }} }"
+                                                        viewBox="0 0 20 20"
+                                                        fill="none"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <path d="m5 10 3 3 7-7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                                                    </svg>
+                                                </button>
+                                            </li>
+                                        @empty
+                                            <li class="px-4 py-3 text-sm text-gray-500">
+                                                No products match your search. Try another term.
+                                            </li>
+                                        @endforelse
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div wire:loading.flex wire:target="productSearch" class="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                                <x-loading-spinner class="size-4" />
+                                Searching catalog…
+                            </div>
+                            <p class="mt-2 text-xs text-gray-500">
+                                Showing {{ $productMatchesCount }} product{{ $productMatchesCount === 1 ? '' : 's' }}
+                                @if ($hasProductSearch)
+                                    for &ldquo;{{ $productSearch }}&rdquo;
+                                @endif
+                                . Results are limited to {{ $productResultsLimit }} at a time.
+                            </p>
+                        </div>
 
                         @error('productId')
                             <p class="mt-2 text-sm text-red-600">{{ $message }}</p>

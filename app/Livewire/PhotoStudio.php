@@ -32,6 +32,8 @@ class PhotoStudio extends Component
 {
     use WithFileUploads;
 
+    private const PRODUCT_SEARCH_LIMIT = 50;
+
     public ?TemporaryUploadedFile $image = null;
 
     public ?int $productId = null;
@@ -81,6 +83,10 @@ class PhotoStudio extends Component
      */
     public array $products = [];
 
+    public string $productSearch = '';
+
+    public int $productResultsLimit = self::PRODUCT_SEARCH_LIMIT;
+
     public function mount(): void
     {
         $team = Auth::user()?->currentTeam;
@@ -89,21 +95,7 @@ class PhotoStudio extends Component
             abort(403, 'Join or create a team to access the Photo Studio.');
         }
 
-        $this->products = Product::query()
-            ->where('team_id', $team->id)
-            ->orderBy('title')
-            ->limit(250)
-            ->get(['id', 'title', 'sku', 'brand', 'image_link'])
-            ->map(static function (Product $product): array {
-                return [
-                    'id' => $product->id,
-                    'title' => $product->title ?: 'Untitled product #'.$product->id,
-                    'sku' => $product->sku,
-                    'brand' => $product->brand,
-                    'image_link' => $product->image_link,
-                ];
-            })
-            ->toArray();
+        $this->refreshProductOptions();
 
         $this->syncSelectedProductPreview();
         $this->refreshLatestGeneration();
@@ -132,6 +124,11 @@ class PhotoStudio extends Component
         $this->resetGenerationPreview();
         $this->syncSelectedProductPreview();
         $this->refreshProductGallery();
+    }
+
+    public function updatedProductSearch(): void
+    {
+        $this->refreshProductOptions();
     }
 
     /**
@@ -699,5 +696,67 @@ TEXT;
             ->find($this->productId);
 
         $this->productImagePreview = $product?->image_link;
+    }
+
+    private function refreshProductOptions(): void
+    {
+        $team = Auth::user()?->currentTeam;
+
+        $this->products = [];
+
+        if (! $team) {
+            return;
+        }
+
+        $search = trim($this->productSearch);
+
+        $query = Product::query()
+            ->where('team_id', $team->id);
+
+        if ($search !== '') {
+            $normalized = Str::lower($search);
+
+            $query->where(static function ($builder) use ($normalized): void {
+                $like = '%'.$normalized.'%';
+
+                $builder
+                    ->whereRaw('LOWER(title) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(sku) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(brand) LIKE ?', [$like]);
+            });
+        }
+
+        $productRecords = $query
+            ->orderBy('title')
+            ->limit(self::PRODUCT_SEARCH_LIMIT)
+            ->get(['id', 'title', 'sku', 'brand', 'image_link']);
+
+        $this->products = $productRecords
+            ->map(static function (Product $product): array {
+                return [
+                    'id' => $product->id,
+                    'title' => $product->title ?: 'Untitled product #'.$product->id,
+                    'sku' => $product->sku,
+                    'brand' => $product->brand,
+                    'image_link' => $product->image_link,
+                ];
+            })
+            ->toArray();
+
+        if ($this->productId && ! collect($this->products)->firstWhere('id', $this->productId)) {
+            $selectedProduct = Product::query()
+                ->where('team_id', $team->id)
+                ->find($this->productId, ['id', 'title', 'sku', 'brand', 'image_link']);
+
+            if ($selectedProduct) {
+                $this->products[] = [
+                    'id' => $selectedProduct->id,
+                    'title' => $selectedProduct->title ?: 'Untitled product #'.$selectedProduct->id,
+                    'sku' => $selectedProduct->sku,
+                    'brand' => $selectedProduct->brand,
+                    'image_link' => $selectedProduct->image_link,
+                ];
+            }
+        }
     }
 }

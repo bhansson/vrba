@@ -157,6 +157,7 @@ class PhotoStudioTest extends TestCase
             ->create([
                 'team_id' => $team->id,
                 'brand' => 'Acme',
+                'image_link' => 'https://cdn.example.com/reference.jpg',
             ]);
 
         $existing = PhotoStudioGeneration::create([
@@ -522,9 +523,10 @@ class PhotoStudioTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
 
-        $imagePayload = $this->samplePngBase64();
+        $imagePayload = $this->testImageBase64();
+        $imageMime = $this->testImageMime();
 
-        $this->fakeOpenRouter(function () use ($imagePayload) {
+        $this->fakeOpenRouter(function () use ($imagePayload, $imageMime) {
             return [
                 'id' => 'photo-studio-image',
                 'model' => 'google/gemini-2.5-flash-image',
@@ -538,7 +540,7 @@ class PhotoStudioTest extends TestCase
                                 [
                                     'type' => 'output_image',
                                     'image_base64' => $imagePayload,
-                                    'mime_type' => 'image/png',
+                                    'mime_type' => $imageMime,
                                 ],
                             ],
                         ],
@@ -561,7 +563,7 @@ class PhotoStudioTest extends TestCase
             prompt: 'Use this prompt as-is',
             model: 'google/gemini-2.5-flash-image',
             disk: 's3',
-            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            imageInput: $this->testImageDataUri(),
             sourceType: 'uploaded_image',
             sourceReference: 'upload.png'
         );
@@ -578,8 +580,9 @@ class PhotoStudioTest extends TestCase
         $this->assertSame('s3', $generation->storage_disk);
         $this->assertNotEmpty($generation->storage_path);
         $this->assertStringEndsWith('.jpg', $generation->storage_path);
-        $this->assertSame(1, $generation->image_width);
-        $this->assertSame(1, $generation->image_height);
+        [$expectedWidth, $expectedHeight] = $this->testImageDimensions();
+        $this->assertSame($expectedWidth, $generation->image_width);
+        $this->assertSame($expectedHeight, $generation->image_height);
 
         Storage::disk('s3')->assertExists($generation->storage_path);
     }
@@ -593,9 +596,10 @@ class PhotoStudioTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
 
-        $pointerPayload = $this->samplePngBase64();
+        $pointerPayload = $this->testImageBase64();
+        $imageMime = $this->testImageMime();
 
-        $this->fakeOpenRouter(function () use ($pointerPayload) {
+        $this->fakeOpenRouter(function () use ($pointerPayload, $imageMime) {
             return [
                 'id' => 'photo-studio-image',
                 'model' => 'google/gemini-2.5-flash-image',
@@ -617,7 +621,7 @@ class PhotoStudioTest extends TestCase
                     [
                         'id' => 'render-1',
                         'data' => [
-                            'mime_type' => 'image/png',
+                            'mime_type' => $imageMime,
                             'base64' => $pointerPayload,
                         ],
                     ],
@@ -635,7 +639,7 @@ class PhotoStudioTest extends TestCase
             prompt: 'Use this prompt as-is',
             model: 'google/gemini-2.5-flash-image',
             disk: 's3',
-            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            imageInput: $this->testImageDataUri(),
             sourceType: 'uploaded_image',
             sourceReference: 'upload.png'
         );
@@ -660,9 +664,10 @@ class PhotoStudioTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
 
-        $inlinePayload = $this->samplePngBase64();
+        $inlinePayload = $this->testImageBase64();
+        $imageMime = $this->testImageMime();
 
-        $this->fakeOpenRouter(function () use ($inlinePayload) {
+        $this->fakeOpenRouter(function () use ($inlinePayload, $imageMime) {
             return [
                 'id' => 'photo-studio-image',
                 'model' => 'google/gemini-2.5-flash-image',
@@ -675,7 +680,7 @@ class PhotoStudioTest extends TestCase
                                 [
                                     'type' => 'output_image',
                                     'image' => [
-                                        'mime_type' => 'image/png',
+                                        'mime_type' => $imageMime,
                                         'base64' => $inlinePayload,
                                     ],
                                 ],
@@ -696,7 +701,7 @@ class PhotoStudioTest extends TestCase
             prompt: 'Use this prompt as-is',
             model: 'google/gemini-2.5-flash-image',
             disk: 's3',
-            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            imageInput: $this->testImageDataUri(),
             sourceType: 'uploaded_image',
             sourceReference: 'upload.png'
         );
@@ -721,8 +726,8 @@ class PhotoStudioTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
 
-        $inlinePayload = $this->samplePngBase64();
-        $dataUri = 'data:image/png;base64,'.$inlinePayload;
+        $inlinePayload = $this->testImageBase64();
+        $dataUri = 'data:'.$this->testImageMime().';base64,'.$inlinePayload;
 
         $this->fakeOpenRouter(function () use ($dataUri) {
             return [
@@ -758,7 +763,7 @@ class PhotoStudioTest extends TestCase
             prompt: 'Use this prompt as-is',
             model: 'google/gemini-2.5-flash-image',
             disk: 's3',
-            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            imageInput: $this->testImageDataUri(),
             sourceType: 'uploaded_image',
             sourceReference: 'upload.png'
         );
@@ -792,8 +797,8 @@ class PhotoStudioTest extends TestCase
             'https://openrouter.ai/api/v1/file/*' => function ($request) use (&$requestLog) {
                 $requestLog[] = $request;
 
-                return Http::response($this->samplePngBinary(), 200, [
-                    'Content-Type' => 'image/png',
+                return Http::response($this->testImageBinary(), 200, [
+                    'Content-Type' => $this->testImageMime(),
                 ]);
             },
         ]);
@@ -831,7 +836,7 @@ class PhotoStudioTest extends TestCase
             prompt: 'Use this prompt as-is',
             model: 'google/gemini-2.5-flash-image',
             disk: 's3',
-            imageInput: 'data:image/png;base64,'.base64_encode('reference'),
+            imageInput: $this->testImageDataUri(),
             sourceType: 'uploaded_image',
             sourceReference: 'upload.png'
         );
@@ -847,6 +852,78 @@ class PhotoStudioTest extends TestCase
         $generation = PhotoStudioGeneration::first();
         $this->assertNotNull($generation);
         Storage::disk('s3')->assertExists($generation->storage_path);
+    }
+
+    public function test_product_search_filters_catalog_results(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        Product::factory()->create([
+            'team_id' => $team->id,
+            'title' => 'Standard Chair',
+            'sku' => 'CHAIR-100',
+        ]);
+
+        $match = Product::factory()->create([
+            'team_id' => $team->id,
+            'title' => 'Emerald Travel Mug',
+            'sku' => 'MUG-777',
+        ]);
+
+        Product::factory()->create([
+            'team_id' => $team->id,
+            'title' => 'Obsidian Lamp',
+            'sku' => 'LAMP-900',
+        ]);
+
+        $this->actingAs($user);
+
+        $component = Livewire::test(PhotoStudio::class)
+            ->set('productSearch', 'emerald');
+
+        $products = collect($component->get('products'));
+
+        $this->assertCount(1, $products);
+        $this->assertSame($match->id, $products->first()['id']);
+
+        $component->set('productSearch', '777');
+        $products = collect($component->get('products'));
+
+        $this->assertCount(1, $products);
+        $this->assertSame($match->id, $products->first()['id']);
+    }
+
+    public function test_selected_product_stays_visible_after_search_change(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+
+        Product::factory()->count(3)->sequence(
+            ['title' => 'Standard Widget A', 'sku' => 'STD-A', 'team_id' => $team->id],
+            ['title' => 'Standard Widget B', 'sku' => 'STD-B', 'team_id' => $team->id],
+            ['title' => 'Standard Widget C', 'sku' => 'STD-C', 'team_id' => $team->id],
+        )->create();
+
+        $featured = Product::factory()->create([
+            'team_id' => $team->id,
+            'title' => 'Zebra Travel Kit',
+            'sku' => 'ZTK-500',
+        ]);
+
+        $this->actingAs($user);
+
+        $component = Livewire::test(PhotoStudio::class)
+            ->set('productId', $featured->id);
+
+        $component->set('productSearch', 'standard');
+
+        $products = collect($component->get('products'));
+
+        $this->assertGreaterThanOrEqual(3, $products->count());
+        $this->assertTrue($products->contains(function (array $product) use ($featured): bool {
+            return $product['id'] === $featured->id;
+        }));
     }
 
     private function createPhotoStudioJob(int $teamId, ?int $productId = null, ?string $sku = null): ProductAiJob
@@ -896,19 +973,58 @@ class PhotoStudioTest extends TestCase
         });
     }
 
-    private function samplePngBase64(): string
+    private function testImagePath(): string
     {
-        return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGgwJ/lAX0NwAAAABJRU5ErkJggg==';
+        return base_path('storage/testing/test.jpeg');
     }
 
-    private function samplePngBinary(): string
+    private function testImageBinary(): string
     {
-        $decoded = base64_decode($this->samplePngBase64(), true);
+        $path = $this->testImagePath();
 
-        if ($decoded === false) {
-            $this->fail('Unable to decode sample PNG payload.');
+        if (! file_exists($path)) {
+            $this->fail('Test image missing at '.$path);
         }
 
-        return $decoded;
+        $contents = file_get_contents($path);
+
+        if ($contents === false) {
+            $this->fail('Unable to read test image contents.');
+        }
+
+        return $contents;
+    }
+
+    private function testImageBase64(): string
+    {
+        return base64_encode($this->testImageBinary());
+    }
+
+    private function testImageMime(): string
+    {
+        return 'image/jpeg';
+    }
+
+    /**
+     * @return array{0:int,1:int}
+     */
+    private function testImageDimensions(): array
+    {
+        $path = $this->testImagePath();
+        $size = @getimagesize($path);
+
+        if ($size === false) {
+            $this->fail('Unable to determine test image dimensions.');
+        }
+
+        return [
+            isset($size[0]) ? (int) $size[0] : 0,
+            isset($size[1]) ? (int) $size[1] : 0,
+        ];
+    }
+
+    private function testImageDataUri(): string
+    {
+        return 'data:'.$this->testImageMime().';base64,'.$this->testImageBase64();
     }
 }

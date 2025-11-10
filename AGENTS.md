@@ -16,11 +16,15 @@ docker compose run --rm vite npm run build
 
 Use `bin/php.sh` for ad-hoc Artisan or tinker commands inside the Octane container. Keep `composer run lint` / `composer run analyse` handy if you add coding standards later.
 
+After completing any coding task, run `docker compose exec octane php artisan octane:reload` to ensure the Octane workers pick up the latest changes.
+
 ## Coding Style & Naming Conventions
 Adhere to PSR-12 with four-space indentation in PHP. Align namespaces with directory structure (`App\\Http\\...`). Livewire components should keep PascalCase class names and blade views under `resources/views/livewire`. If you introduce linting/formatting tooling (Pint, ESLint, Prettier), document it and bake it into Composer/NPM scripts instead of relying on local IDE rules.
 
 ## Testing Guidelines
 Mirror production namespaces in `tests/` to keep autoloaders simple. Feature tests already cover authentication, password resets, API tokens, and team flows—extend them when you touch those areas. Target ~80 % statement coverage and call out gaps in PR descriptions. Use factories for setup; seed data via helpers instead of hardcoding IDs, and stub outbound HTTP calls (feed ingestion, OpenRouter summaries) instead of hitting real services.
+
+Always run PHP/Artisan commands inside the Octane container (e.g. `docker compose exec octane php artisan test`) so you pick up the correct PHP version, extensions, and env variables that match CI.
 
 ## Commit & Pull Request Guidelines
 The history is new, so adopt Conventional Commits (`feat:`, `fix:`, `chore:`) to make changelog generation effortless. Scope each commit to a single logical change and describe the behaviour adjustment, not the implementation. PRs must include a summary, testing evidence (`composer test` output or screenshots for UI work), linked issues, and roll-back considerations. Request review before merging and wait for CI to pass; use draft PRs for work in progress.
