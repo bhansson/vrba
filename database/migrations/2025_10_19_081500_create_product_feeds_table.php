@@ -33,7 +33,7 @@ return new class extends Migration
             $table->string('sku', 191);
             $table->string('gtin', 191)->nullable();
             $table->string('title');
-            $table->string('brand');
+            $table->string('brand')->nullable();
             $table->text('description')->nullable();
             $table->string('url', 2048);
             $table->string('image_link', 2048)->nullable();
