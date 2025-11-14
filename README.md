@@ -1,4 +1,4 @@
-# VRBA Laravel Stack
+# Magnifiq Laravel Stack
 
 This repository ships with a Docker Compose setup that runs Laravel Octane on Swoole for a fast local development loop. The stack also includes dedicated services for queues, scheduled tasks, Redis, and the Vite dev server.
 

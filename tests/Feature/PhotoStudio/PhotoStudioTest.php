@@ -784,7 +784,7 @@ class PhotoStudioTest extends TestCase
         config()->set('services.photo_studio.generation_disk', 's3');
         config()->set('laravel-openrouter.api_key', 'test-key');
         config()->set('laravel-openrouter.referer', 'https://example.com/app');
-        config()->set('laravel-openrouter.title', 'VRBA Test');
+        config()->set('laravel-openrouter.title', 'Magnifiq Test');
 
         Storage::fake('s3');
 
@@ -847,7 +847,7 @@ class PhotoStudioTest extends TestCase
         $request = $requestLog[0];
         $this->assertSame('Bearer test-key', $request->header('Authorization')[0]);
         $this->assertSame('https://example.com/app', $request->header('HTTP-Referer')[0]);
-        $this->assertSame('VRBA Test', $request->header('X-Title')[0]);
+        $this->assertSame('Magnifiq Test', $request->header('X-Title')[0]);
 
         $generation = PhotoStudioGeneration::first();
         $this->assertNotNull($generation);

@@ -398,7 +398,7 @@ class ManageProductFeeds extends Component
             ],
             'timeout' => 20,
         ])->withHeaders([
-            'User-Agent' => 'VRBA-FeedFetcher/1.0 (+https://example.com)',
+            'User-Agent' => 'Magnifiq-FeedFetcher/1.0 (+https://example.com)',
             'Accept' => 'text/xml,application/xml,application/rss+xml,text/csv,application/csv,text/plain;q=0.9,*/*;q=0.8',
         ])->get($this->feedUrl);
 

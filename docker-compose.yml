@@ -6,8 +6,8 @@ services:
       args:
         PUID: ${PUID:-1000}
         PGID: ${PGID:-1000}
-    image: vrba/octane:local
-    container_name: vrba-octane
+    image: magnifiq/octane:local
+    container_name: magnifiq-octane
     ports:
       - "${OCTANE_PORT:-8000}:8000"
     environment:
@@ -31,7 +31,7 @@ services:
       args:
         PUID: ${PUID:-1000}
         PGID: ${PGID:-1000}
-    image: vrba/octane:local
+    image: magnifiq/octane:local
     command: ["php", "artisan", "horizon"]
     environment:
       APP_ENV: ${APP_ENV:-local}
@@ -50,8 +50,8 @@ services:
       args:
         PUID: ${PUID:-1000}
         PGID: ${PGID:-1000}
-    image: vrba/octane:local
-    container_name: vrba-scheduler
+    image: magnifiq/octane:local
+    container_name: magnifiq-scheduler
     command: ["php", "artisan", "schedule:work"]
     environment:
       APP_ENV: ${APP_ENV:-local}
@@ -65,7 +65,7 @@ services:
 
   vite:
     image: node:22-alpine
-    container_name: vrba-vite
+    container_name: magnifiq-vite
     working_dir: /var/www/html
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port $${VITE_PORT:-5173}"
     ports:
@@ -79,7 +79,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: vrba-redis
+    container_name: magnifiq-redis
     command: redis-server --save "" --appendonly no
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -88,7 +88,7 @@ services:
 
   supabase-db:
     image: supabase/postgres:15.8.1.085
-    container_name: vrba-supabase-db
+    container_name: magnifiq-supabase-db
     restart: unless-stopped
     ports:
       - "${SUPABASE_DB_PORT:-54322}:5432"
