@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-VRBA is a Laravel 12 + Jetstream (Livewire stack) application running on Laravel Octane with Swoole, designed for AI-powered product catalog management and marketing content generation. The platform features team-based multi-tenancy where users can import product feeds, generate marketing copy through AI templates, and create photorealistic product images via the Photo Studio feature.
+Magnifiq is a Laravel 12 + Jetstream (Livewire stack) application running on Laravel Octane with Swoole, designed for AI-powered product catalog management and marketing content generation. The platform features team-based multi-tenancy where users can import product feeds, generate marketing copy through AI templates, and create photorealistic product images via the Photo Studio feature.
 
 ## Development Environment
 
