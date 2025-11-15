@@ -163,6 +163,7 @@ class ManageProductFeeds extends Component
                 $chunks = $parsed['items']->chunk(100);
                 $type = $parsed['type'];
                 $namespaces = $parsed['namespaces'];
+                $seenSkus = [];
 
                 foreach ($chunks as $chunk) {
                     $payload = [];
@@ -174,6 +175,12 @@ class ManageProductFeeds extends Component
                         if ($sku === '' || $title === '' || $link === '') {
                             continue;
                         }
+
+                        // Skip duplicate SKUs - keep first occurrence only
+                        if (isset($seenSkus[$sku])) {
+                            continue;
+                        }
+                        $seenSkus[$sku] = true;
 
                         $payload[] = [
                             'product_feed_id' => $feed->id,
@@ -328,6 +335,7 @@ class ManageProductFeeds extends Component
                 $feed->products()->delete();
 
                 $chunks = $items->chunk(100);
+                $seenSkus = [];
 
                 foreach ($chunks as $chunk) {
                     $payload = [];
@@ -339,6 +347,12 @@ class ManageProductFeeds extends Component
                         if ($sku === '' || $title === '' || $link === '') {
                             continue;
                         }
+
+                        // Skip duplicate SKUs - keep first occurrence only
+                        if (isset($seenSkus[$sku])) {
+                            continue;
+                        }
+                        $seenSkus[$sku] = true;
 
                         $payload[] = [
                             'product_feed_id' => $feed->id,
