@@ -105,3 +105,5 @@ volumes:
   node_modules:
   redis-data:
   supabase-data:
+    external: true
+    name: vrba_supabase-data
